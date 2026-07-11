@@ -1,0 +1,21 @@
+CONTENIDO DEL PAQUETE
+
+- index.html
+  App completa. Incluye estructura, estilos verde limon y logica de PDF.
+
+- README.md
+  Explicacion para GitHub.
+
+- .nojekyll
+  Archivo recomendado para GitHub Pages.
+
+
+COMO SUBIRLO
+
+Sube todo el contenido de esta carpeta a la raiz de un repositorio de GitHub.
+Despues activa GitHub Pages desde Settings > Pages.
+
+
+IMPORTANTE
+
+No borres index.html. Es el archivo que GitHub Pages abre como pagina principal.

@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Informe Correctivo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <style>
+    :root {
+      --lime: #baff00;
+      --lime-strong: #8fc900;
+      --ink: #10140d;
+      --muted: #58604d;
+      --paper: #fbfff2;
+      --panel: #f2ffd0;
+      --line: #d3ef68;
+      --danger: #b42318;
+      --shadow: 0 18px 50px rgba(80, 120, 0, .18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(186, 255, 0, .4), transparent 34rem),
+        linear-gradient(135deg, #f8ffe6 0%, #ffffff 45%, #efffc2 100%);
+    }
+
+    button, input, textarea {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 42px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--lime);
+      box-shadow: var(--shadow);
+      font-weight: 700;
+    }
+
+    h1, h2, h3, p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 4px;
+      font-size: clamp(1.55rem, 3vw, 2.35rem);
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.04fr) minmax(320px, .96fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: rgba(251, 255, 242, .92);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .panel + .panel {
+      margin-top: 18px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-weight: 700;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: .92rem;
+    }
+
+    input[type="file"], textarea, input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--ink);
+    }
+
+    textarea {
+      min-height: 170px;
+      resize: vertical;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      border: 1px solid var(--lime-strong);
+      border-radius: 8px;
+      padding: 11px 14px;
+      background: #ffffff;
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 700;
+      min-height: 44px;
+    }
+
+    .btn:hover {
+      background: var(--panel);
+    }
+
+    .btn.primary {
+      background: var(--lime);
+      border-color: var(--lime-strong);
+    }
+
+    .btn.danger {
+      border-color: #ffb4ac;
+      color: var(--danger);
+    }
+
+    .btn:disabled {
+      opacity: .52;
+      cursor: not-allowed;
+    }
+
+    .file-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .file-name {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 700;
+    }
+
+    .file-size {
+      color: var(--muted);
+      white-space: nowrap;
+      font-size: .9rem;
+    }
+
+    .status {
+      margin-top: 14px;
+      min-height: 26px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.65rem;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: .92rem;
+    }
+
+    .preview-shell {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 26px;
+      max-height: 68vh;
+      overflow: auto;
+    }
+
+    .report {
+      color: #111111;
+      line-height: 1.5;
+    }
+
+    .report h2 {
+      border-bottom: 3px solid var(--lime);
+      padding-bottom: 8px;
+    }
+
+    .report h3 {
+      margin-top: 24px;
+      color: #263100;
+    }
+
+    .report table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+    }
+
+    .report th, .report td {
+      border: 1px solid #cbe85d;
+      padding: 9px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .report th {
+      background: #efffb5;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: var(--lime);
+      border: 1px solid var(--lime-strong);
+      padding: 5px 10px;
+      font-weight: 700;
+    }
+
+    .empty {
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: rgba(255, 255, 255, .62);
+    }
+
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .button-row .btn {
+        flex: 1 1 180px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">IC</div>
+        <div>
+          <h1>Informe correctivo</h1>
+          <p class="subhead">Une PDFs, interpreta tus criterios y usa un modelo como apoyo para redactar el informe.</p>
+        </div>
+      </div>
+      <span class="pill">Verde limon</span>
+    </div>
+
+    <section id="inputScreen" class="screen active" aria-labelledby="inputTitle">
+      <div class="layout">
+        <div>
+          <div class="panel">
+            <h2 id="inputTitle">Carga de documentos</h2>
+            <div class="field">
+              <label for="pdfInput">Informes PDF</label>
+              <input id="pdfInput" type="file" accept="application/pdf,.pdf" multiple>
+              <p class="hint">Puedes seleccionar varios PDFs. Al unirlos se conserva el orden de carga.</p>
+            </div>
+            <div id="fileList" class="file-list" aria-live="polite">
+              <div class="empty">Todavia no hay PDFs cargados.</div>
+            </div>
+            <div class="button-row" style="margin-top: 16px;">
+              <button id="clearPdfsBtn" class="btn danger" type="button">Eliminar PDFs cargados</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Criterios del informe</h2>
+            <div class="field">
+              <label for="criteriaText">Texto con formato, criterios o instrucciones</label>
+              <textarea id="criteriaText" placeholder="Pega aqui el texto que define el formato, apartados, tono, criterios tecnicos, normativa o estructura que debe seguir el informe..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <h2>Modelo de apoyo</h2>
+            <div class="field">
+              <label for="modelFile">Archivo de modelo</label>
+              <input id="modelFile" type="file" accept=".txt,.md,.pdf,application/pdf,text/plain,text/markdown">
+              <p class="hint">Acepta TXT, MD o PDF. Si el modelo esta en PDF, la app intentara extraer su texto.</p>
+            </div>
+            <div class="field">
+              <label for="modelText">O pega aqui el modelo</label>
+              <textarea id="modelText" placeholder="Pega un informe modelo, una plantilla o un ejemplo que quieras imitar..."></textarea>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Generacion</h2>
+            <div class="summary-grid">
+              <div class="stat"><strong id="pdfCount">0</strong><span>PDFs cargados</span></div>
+              <div class="stat"><strong id="criteriaCount">0</strong><span>caracteres de criterios</span></div>
+              <div class="stat"><strong id="modelCount">0</strong><span>caracteres de modelo</span></div>
+            </div>
+            <div class="button-row">
+              <button id="generateBtn" class="btn primary" type="button">Unir PDFs y crear informe</button>
+              <button id="previewBtn" class="btn" type="button" disabled>Ver como sale</button>
+            </div>
+            <div id="status" class="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="previewScreen" class="screen" aria-labelledby="previewTitle">
+      <div class="panel">
+        <div class="topbar">
+          <div>
+            <h2 id="previewTitle">Vista previa del informe</h2>
+            <p class="subhead">Revisa el resultado antes de descargar.</p>
+          </div>
+          <div class="button-row">
+            <button id="backBtn" class="btn" type="button">Volver</button>
+            <button id="downloadReportBtn" class="btn primary" type="button">Descargar informe</button>
+            <button id="downloadMergedBtn" class="btn" type="button">Descargar PDFs unidos</button>
+          </div>
+        </div>
+        <div class="preview-shell">
+          <article id="reportPreview" class="report"></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    const pdfjs = window.pdfjsLib || await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+
+    const state = {
+      pdfFiles: [],
+      mergedPdfBytes: null,
+      reportHtml: "",
+      reportText: "",
+      extractedPdfText: ""
+    };
+
+    const els = {
+      inputScreen: document.getElementById("inputScreen"),
+      previewScreen: document.getElementById("previewScreen"),
+      pdfInput: document.getElementById("pdfInput"),
+      fileList: document.getElementById("fileList"),
+      criteriaText: document.getElementById("criteriaText"),
+      modelFile: document.getElementById("modelFile"),
+      modelText: document.getElementById("modelText"),
+      clearPdfsBtn: document.getElementById("clearPdfsBtn"),
+      generateBtn: document.getElementById("generateBtn"),
+      previewBtn: document.getElementById("previewBtn"),
+      backBtn: document.getElementById("backBtn"),
+      downloadReportBtn: document.getElementById("downloadReportBtn"),
+      downloadMergedBtn: document.getElementById("downloadMergedBtn"),
+      reportPreview: document.getElementById("reportPreview"),
+      status: document.getElementById("status"),
+      pdfCount: document.getElementById("pdfCount"),
+      criteriaCount: document.getElementById("criteriaCount"),
+      modelCount: document.getElementById("modelCount")
+    };
+
+    const sectionNames = [
+      "Objeto",
+      "Antecedentes",
+      "Alcance",
+      "Descripcion de la incidencia",
+      "Analisis tecnico",
+      "Causa probable",
+      "Actuacion correctiva",
+      "Materiales y medios",
+      "Pruebas y verificaciones",
+      "Conclusiones"
+    ];
+
+    function setStatus(message, isError = false) {
+      els.status.textContent = message;
+      els.status.classList.toggle("error", isError);
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "0 KB";
+      const units = ["B", "KB", "MB", "GB"];
+      let value = bytes;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+      }
+      return `${value.toFixed(unit ? 1 : 0)} ${units[unit]}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function updateStats() {
+      els.pdfCount.textContent = state.pdfFiles.length;
+      els.criteriaCount.textContent = els.criteriaText.value.length;
+      els.modelCount.textContent = (els.modelText.value || "").length;
+    }
+
+    function renderFileList() {
+      if (!state.pdfFiles.length) {
+        els.fileList.innerHTML = '<div class="empty">Todavia no hay PDFs cargados.</div>';
+        return;
+      }
+
+      els.fileList.innerHTML = state.pdfFiles.map((file, index) => `
+        <div class="file-item">
+          <span class="file-name">${index + 1}. ${escapeHtml(file.name)}</span>
+          <span class="file-size">${formatBytes(file.size)}</span>
+        </div>
+      `).join("");
+    }
+
+    async function fileToArrayBuffer(file) {
+      return await file.arrayBuffer();
+    }
+
+    async function extractTextFromPdf(file) {
+      const data = new Uint8Array(await fileToArrayBuffer(file));
+      const doc = await pdfjs.getDocument({ data }).promise;
+      const pages = [];
+
+      for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
+        const page = await doc.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const text = content.items.map(item => item.str).join(" ");
+        pages.push(text);
+      }
+
+      return pages.join("\n\n");
+    }
+
+    async function readModelText() {
+      const pasted = els.modelText.value.trim();
+      const file = els.modelFile.files[0];
+
+      if (!file) return pasted;
+      if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+        const extracted = await extractTextFromPdf(file);
+        return [pasted, extracted].filter(Boolean).join("\n\n");
+      }
+
+      const fileText = await file.text();
+      return [pasted, fileText].filter(Boolean).join("\n\n");
+    }
+
+    async function mergePdfs(files) {
+      const merged = await PDFLib.PDFDocument.create();
+
+      for (const file of files) {
+        const sourceBytes = await fileToArrayBuffer(file);
+        const source = await PDFLib.PDFDocument.load(sourceBytes);
+        const pages = await merged.copyPages(source, source.getPageIndices());
+        pages.forEach(page => merged.addPage(page));
+      }
+
+      return await merged.save();
+    }
+
+    function splitSentences(text, limit = 9) {
+      return text
+        .replace(/\s+/g, " ")
+        .split(/(?<=[.!?;:])\s+/)
+        .map(item => item.trim())
+        .filter(item => item.length > 30)
+        .slice(0, limit);
+    }
+
+    function findKeywords(text) {
+      const common = new Set(["para", "como", "con", "por", "los", "las", "una", "del", "que", "debe", "deben", "este", "esta", "sobre", "entre", "desde", "hasta", "segun", "donde", "cada", "todo"]);
+      const words = text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .match(/[a-z0-9]{4,}/g) || [];
+
+      const counts = new Map();
+      words.forEach(word => {
+        if (!common.has(word)) counts.set(word, (counts.get(word) || 0) + 1);
+      });
+
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12)
+        .map(([word]) => word);
+    }
+
+    function inferSections(criteria, model) {
+      const combined = `${criteria}\n${model}`;
+      const selected = sectionNames.filter(name => new RegExp(name.split(" ")[0], "i").test(combined));
+      return selected.length ? selected : sectionNames;
+    }
+
+    function buildCorrectiveReport({ criteria, model, sourceText, files }) {
+      const now = new Date();
+      const keywords = findKeywords(`${criteria}\n${model}\n${sourceText}`);
+      const criteriaSentences = splitSentences(criteria, 8);
+      const modelSentences = splitSentences(model, 8);
+      const sourceSentences = splitSentences(sourceText, 12);
+      const sections = inferSections(criteria, model);
+      const fileRows = files.map(file => `
+        <tr>
+          <td>${escapeHtml(file.name)}</td>
+          <td>${escapeHtml(formatBytes(file.size))}</td>
+        </tr>
+      `).join("");
+
+      const criteriaList = criteriaSentences.length
+        ? criteriaSentences.map(item => `<li>${escapeHtml(item)}</li>`).join("")
+        : "<li>Seguir una estructura clara, tecnica y verificable para documentar la actuacion correctiva.</li>";
+
+      const modelList = modelSentences.length
+        ? modelSentences.map(item => `<li>${escapeHtml(item)}</li>`).join("")
+        : "<li>No se ha detectado un modelo textual amplio; se aplica una estructura profesional de informe correctivo.</li>";
+
+      const sourceList = sourceSentences.length
+        ? sourceSentences.map(item => `<li>${escapeHtml(item)}</li>`).join("")
+        : "<li>Los PDFs se han unido correctamente. Si el PDF contiene escaneos sin OCR, revisa el contenido manualmente.</li>";
+
+      const sectionBlocks = sections.map(section => {
+        const sectionText = makeSectionText(section, keywords, sourceSentences, criteriaSentences, modelSentences);
+        return `<h3>${escapeHtml(section)}</h3><p>${escapeHtml(sectionText)}</p>`;
+      }).join("");
+
+      const html = `
+        <h2>Informe correctivo</h2>
+        <p><strong>Fecha:</strong> ${escapeHtml(now.toLocaleDateString("es-ES"))}</p>
+        <p><strong>Documentacion revisada:</strong> ${files.length} PDF(s) unidos y analizados como base documental.</p>
+
+        <h3>Documentos incorporados</h3>
+        <table>
+          <thead><tr><th>Archivo</th><th>Tamano</th></tr></thead>
+          <tbody>${fileRows}</tbody>
+        </table>
+
+        <h3>Criterios aplicados</h3>
+        <ul>${criteriaList}</ul>
+
+        <h3>Patron tomado del modelo</h3>
+        <ul>${modelList}</ul>
+
+        <h3>Contenido identificado en los PDFs</h3>
+        <ul>${sourceList}</ul>
+
+        ${sectionBlocks}
+
+        <h3>Resumen de enfoque</h3>
+        <p>El informe se ha preparado atendiendo a los criterios indicados por el usuario, tomando el modelo como referencia de estilo y estructura, e incorporando la informacion disponible en los documentos PDF cargados. Palabras clave detectadas: ${escapeHtml(keywords.join(", ") || "sin palabras clave suficientes")}.</p>
+      `;
+
+      const plainText = html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/(h2|h3|p|li|tr)>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      return { html, plainText };
+    }
+
+    function makeSectionText(section, keywords, sourceSentences, criteriaSentences, modelSentences) {
+      const keyText = keywords.slice(0, 5).join(", ") || "la documentacion aportada";
+      const evidence = sourceSentences[0] || criteriaSentences[0] || modelSentences[0] || "la informacion aportada por el usuario";
+      const templates = {
+        "Objeto": `Definir el alcance del correctivo a partir de ${keyText}, dejando constancia de la documentacion revisada y del resultado esperado de la actuacion.`,
+        "Antecedentes": `Se toma como antecedente principal: ${evidence}`,
+        "Alcance": `El alcance incluye la revision de los informes aportados, la identificacion de desviaciones y la propuesta de medidas correctivas coherentes con el modelo facilitado.`,
+        "Descripcion de la incidencia": `La incidencia debe describirse de forma objetiva, indicando ubicacion, elemento afectado, sintomas observados y condicion que motiva la actuacion.`,
+        "Analisis tecnico": `El analisis tecnico relaciona los hallazgos documentales con ${keyText}, priorizando causas verificables y evitando conclusiones no sustentadas.`,
+        "Causa probable": `Como causa probable se debe consignar la hipotesis tecnica mejor apoyada por los documentos, indicando cualquier limitacion si faltan pruebas, mediciones u observaciones directas.`,
+        "Actuacion correctiva": `Se recomienda ejecutar una actuacion correctiva ordenada: inspeccion previa, correccion de la deficiencia, sustitucion o ajuste cuando proceda, limpieza de la zona y registro fotografico o documental.`,
+        "Materiales y medios": `Los materiales, equipos y medios auxiliares deberan adecuarse a la incidencia concreta y quedar reflejados con cantidades, referencias y criterios de aceptacion cuando esten disponibles.`,
+        "Pruebas y verificaciones": `Tras la correccion se deberan realizar pruebas funcionales, comprobaciones visuales y verificacion documental para confirmar que la incidencia queda resuelta.`,
+        "Conclusiones": `La conclusion debe cerrar el informe con el estado final, las reservas tecnicas si existen y las recomendaciones de seguimiento o mantenimiento preventivo.`
+      };
+
+      return templates[section] || `Este apartado se redacta siguiendo el criterio indicado y tomando como referencia ${keyText}.`;
+    }
+
+    function showPreview() {
+      els.inputScreen.classList.remove("active");
+      els.previewScreen.classList.add("active");
+      els.reportPreview.innerHTML = state.reportHtml || "<p>No hay informe generado.</p>";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function showInput() {
+      els.previewScreen.classList.remove("active");
+      els.inputScreen.classList.add("active");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function downloadBlob(bytes, type, filename) {
+      const blob = new Blob([bytes], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function downloadReportPdf() {
+      if (!state.reportText) return;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const margin = 42;
+      const maxWidth = 511;
+      const lines = doc.splitTextToSize(state.reportText, maxWidth);
+      let y = margin;
+
+      doc.setFillColor(186, 255, 0);
+      doc.rect(0, 0, 595, 20, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("Informe correctivo", margin, y);
+      y += 28;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10.5);
+
+      for (const line of lines) {
+        if (y > 800) {
+          doc.addPage();
+          doc.setFillColor(186, 255, 0);
+          doc.rect(0, 0, 595, 20, "F");
+          y = margin;
+        }
+        doc.text(line, margin, y);
+        y += 14;
+      }
+
+      doc.save("informe-correctivo.pdf");
+    }
+
+    els.pdfInput.addEventListener("change", () => {
+      const newFiles = Array.from(els.pdfInput.files || []);
+      state.pdfFiles = [...state.pdfFiles, ...newFiles];
+      els.pdfInput.value = "";
+      state.mergedPdfBytes = null;
+      state.reportHtml = "";
+      state.reportText = "";
+      els.previewBtn.disabled = true;
+      renderFileList();
+      updateStats();
+      setStatus("");
+    });
+
+    els.criteriaText.addEventListener("input", updateStats);
+    els.modelText.addEventListener("input", updateStats);
+    els.modelFile.addEventListener("change", () => setStatus(els.modelFile.files[0] ? `Modelo cargado: ${els.modelFile.files[0].name}` : ""));
+
+    els.clearPdfsBtn.addEventListener("click", () => {
+      state.pdfFiles = [];
+      state.mergedPdfBytes = null;
+      state.extractedPdfText = "";
+      els.previewBtn.disabled = true;
+      renderFileList();
+      updateStats();
+      setStatus("PDFs eliminados.");
+    });
+
+    els.generateBtn.addEventListener("click", async () => {
+      if (!state.pdfFiles.length) {
+        setStatus("Carga al menos un PDF para unir y analizar.", true);
+        return;
+      }
+
+      els.generateBtn.disabled = true;
+      els.previewBtn.disabled = true;
+
+      try {
+        setStatus("Uniendo PDFs...");
+        state.mergedPdfBytes = await mergePdfs(state.pdfFiles);
+
+        setStatus("Extrayendo texto de los PDFs...");
+        const extracted = [];
+        for (const file of state.pdfFiles) {
+          try {
+            extracted.push(await extractTextFromPdf(file));
+          } catch (error) {
+            extracted.push(`No se pudo extraer texto de ${file.name}.`);
+          }
+        }
+        state.extractedPdfText = extracted.join("\n\n");
+
+        setStatus("Analizando criterios y modelo...");
+        const criteria = els.criteriaText.value.trim();
+        const model = await readModelText();
+        const report = buildCorrectiveReport({
+          criteria,
+          model,
+          sourceText: state.extractedPdfText,
+          files: state.pdfFiles
+        });
+        state.reportHtml = report.html;
+        state.reportText = report.plainText;
+
+        els.previewBtn.disabled = false;
+        setStatus("Informe generado. Ya puedes verlo o descargarlo.");
+      } catch (error) {
+        console.error(error);
+        setStatus(`No se pudo completar la generacion: ${error.message}`, true);
+      } finally {
+        els.generateBtn.disabled = false;
+      }
+    });
+
+    els.previewBtn.addEventListener("click", showPreview);
+    els.backBtn.addEventListener("click", showInput);
+    els.downloadReportBtn.addEventListener("click", downloadReportPdf);
+    els.downloadMergedBtn.addEventListener("click", () => {
+      if (state.mergedPdfBytes) {
+        downloadBlob(state.mergedPdfBytes, "application/pdf", "pdfs-unidos.pdf");
+      }
+    });
+
+    updateStats();
+  </script>
+</body>
+</html>

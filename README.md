@@ -8,9 +8,10 @@ App web estatica para GitHub Pages.
 - Une todos los PDFs en un unico archivo descargable.
 - Permite pegar un texto con criterios de formato y redaccion.
 - Permite cargar o pegar un modelo de apoyo.
-- Genera una vista previa de informe correctivo.
-- Descarga el informe generado en PDF.
+- Genera una vista previa como listado de correctivos.
+- Descarga el informe generado en Word o PDF.
 - Permite volver a la pantalla principal y eliminar los PDFs cargados.
+- Mantiene guardados los PDFs, el texto de criterios, el texto del modelo y el modelo cargado hasta que se eliminen desde la app.
 
 ## Publicacion en GitHub Pages
 
@@ -27,4 +28,8 @@ GitHub generara una URL publica para abrir la app.
 
 La app funciona directamente en el navegador. No necesita servidor propio.
 
+El informe generado sigue el formato de correctivos: titulo en mayusculas, incidencias agrupadas y tabla por incidencia con columnas `Edificio / Instalacion`, `Sistema` y `Correctivo`.
+
 La lectura de PDFs depende de que el PDF tenga texto seleccionable. Si el PDF es un escaneo sin OCR, se podra unir y descargar, pero el analisis del contenido sera limitado.
+
+Los ficheros se guardan en el navegador del usuario mediante almacenamiento local/IndexedDB. No se suben a ningun servidor.

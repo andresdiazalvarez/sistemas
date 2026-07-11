@@ -1,7 +1,7 @@
 CONTENIDO DEL PAQUETE
 
 - index.html
-  App completa. Incluye estructura, estilos verde limon y logica de PDF.
+  App completa. Incluye estructura, estilos verde limon, union de PDFs y generacion de correctivos.
 
 - README.md
   Explicacion para GitHub.
@@ -19,3 +19,7 @@ Despues activa GitHub Pages desde Settings > Pages.
 IMPORTANTE
 
 No borres index.html. Es el archivo que GitHub Pages abre como pagina principal.
+
+La descarga principal del informe es Word. Tambien hay descarga en PDF.
+
+Los PDFs, criterios y modelo quedan guardados en el navegador hasta pulsar eliminar.

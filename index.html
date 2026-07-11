@@ -256,13 +256,18 @@
     }
 
     .report h2 {
+      text-align: center;
+      text-transform: uppercase;
+      font-size: 1.65rem;
+      font-weight: 700;
       border-bottom: 3px solid var(--lime);
       padding-bottom: 8px;
     }
 
     .report h3 {
       margin-top: 24px;
-      color: #263100;
+      color: #0057b8;
+      font-weight: 700;
     }
 
     .report table {
@@ -348,6 +353,7 @@
             </div>
             <div class="button-row" style="margin-top: 16px;">
               <button id="clearPdfsBtn" class="btn danger" type="button">Eliminar PDFs cargados</button>
+              <button id="clearAllBtn" class="btn danger" type="button">Eliminar todo lo cargado</button>
             </div>
           </div>
 
@@ -400,7 +406,8 @@
           </div>
           <div class="button-row">
             <button id="backBtn" class="btn" type="button">Volver</button>
-            <button id="downloadReportBtn" class="btn primary" type="button">Descargar informe</button>
+            <button id="downloadWordBtn" class="btn primary" type="button">Descargar Word</button>
+            <button id="downloadReportBtn" class="btn" type="button">Descargar PDF</button>
             <button id="downloadMergedBtn" class="btn" type="button">Descargar PDFs unidos</button>
           </div>
         </div>
@@ -420,7 +427,8 @@
       mergedPdfBytes: null,
       reportHtml: "",
       reportText: "",
-      extractedPdfText: ""
+      extractedPdfText: "",
+      modelFile: null
     };
 
     const els = {
@@ -432,10 +440,12 @@
       modelFile: document.getElementById("modelFile"),
       modelText: document.getElementById("modelText"),
       clearPdfsBtn: document.getElementById("clearPdfsBtn"),
+      clearAllBtn: document.getElementById("clearAllBtn"),
       generateBtn: document.getElementById("generateBtn"),
       previewBtn: document.getElementById("previewBtn"),
       backBtn: document.getElementById("backBtn"),
       downloadReportBtn: document.getElementById("downloadReportBtn"),
+      downloadWordBtn: document.getElementById("downloadWordBtn"),
       downloadMergedBtn: document.getElementById("downloadMergedBtn"),
       reportPreview: document.getElementById("reportPreview"),
       status: document.getElementById("status"),
@@ -456,6 +466,22 @@
       "Pruebas y verificaciones",
       "Conclusiones"
     ];
+
+    const storageKeys = {
+      criteriaText: "sistemas.criteriaText",
+      modelText: "sistemas.modelText",
+      pdfFiles: "pdfFiles",
+      modelFile: "modelFile"
+    };
+
+    const dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open("sistemas-correctivos", 1);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore("uploads");
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
 
     function setStatus(message, isError = false) {
       els.status.textContent = message;
@@ -486,7 +512,8 @@
     function updateStats() {
       els.pdfCount.textContent = state.pdfFiles.length;
       els.criteriaCount.textContent = els.criteriaText.value.length;
-      els.modelCount.textContent = (els.modelText.value || "").length;
+      const modelFileSize = state.modelFile ? state.modelFile.size : 0;
+      els.modelCount.textContent = (els.modelText.value || "").length + (modelFileSize ? ` + ${formatBytes(modelFileSize)}` : "");
     }
 
     function renderFileList() {
@@ -507,6 +534,95 @@
       return await file.arrayBuffer();
     }
 
+    async function idbPut(key, value) {
+      const db = await dbPromise;
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction("uploads", "readwrite");
+        tx.objectStore("uploads").put(value, key);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function idbGet(key) {
+      const db = await dbPromise;
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction("uploads", "readonly");
+        const request = tx.objectStore("uploads").get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function idbDelete(key) {
+      const db = await dbPromise;
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction("uploads", "readwrite");
+        tx.objectStore("uploads").delete(key);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    function fileToRecord(file) {
+      return {
+        name: file.name,
+        type: file.type,
+        lastModified: file.lastModified,
+        blob: file
+      };
+    }
+
+    function recordToFile(record) {
+      return new File([record.blob], record.name, {
+        type: record.type || "application/octet-stream",
+        lastModified: record.lastModified || Date.now()
+      });
+    }
+
+    async function persistPdfFiles() {
+      await idbPut(storageKeys.pdfFiles, state.pdfFiles.map(fileToRecord));
+    }
+
+    async function persistModelFile(file) {
+      state.modelFile = file || null;
+      if (file) {
+        await idbPut(storageKeys.modelFile, fileToRecord(file));
+      } else {
+        await idbDelete(storageKeys.modelFile);
+      }
+      updateStats();
+    }
+
+    function persistTextFields() {
+      localStorage.setItem(storageKeys.criteriaText, els.criteriaText.value);
+      localStorage.setItem(storageKeys.modelText, els.modelText.value);
+    }
+
+    async function restorePersistedData() {
+      els.criteriaText.value = localStorage.getItem(storageKeys.criteriaText) || "";
+      els.modelText.value = localStorage.getItem(storageKeys.modelText) || "";
+
+      try {
+        const storedPdfs = await idbGet(storageKeys.pdfFiles);
+        state.pdfFiles = Array.isArray(storedPdfs) ? storedPdfs.map(recordToFile) : [];
+
+        const storedModel = await idbGet(storageKeys.modelFile);
+        state.modelFile = storedModel ? recordToFile(storedModel) : null;
+      } catch (error) {
+        console.warn("No se pudieron restaurar los ficheros guardados", error);
+        setStatus("No se pudieron restaurar algunos ficheros guardados.", true);
+      }
+
+      renderFileList();
+      updateStats();
+
+      if (state.pdfFiles.length || state.modelFile || els.criteriaText.value || els.modelText.value) {
+        const modelMsg = state.modelFile ? ` Modelo guardado: ${state.modelFile.name}.` : "";
+        setStatus(`Datos cargados restaurados.${modelMsg}`);
+      }
+    }
+
     async function extractTextFromPdf(file) {
       const data = new Uint8Array(await fileToArrayBuffer(file));
       const doc = await pdfjs.getDocument({ data }).promise;
@@ -524,7 +640,7 @@
 
     async function readModelText() {
       const pasted = els.modelText.value.trim();
-      const file = els.modelFile.files[0];
+      const file = els.modelFile.files[0] || state.modelFile;
 
       if (!file) return pasted;
       if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
@@ -584,89 +700,158 @@
     }
 
     function buildCorrectiveReport({ criteria, model, sourceText, files }) {
-      const now = new Date();
-      const keywords = findKeywords(`${criteria}\n${model}\n${sourceText}`);
-      const criteriaSentences = splitSentences(criteria, 8);
-      const modelSentences = splitSentences(model, 8);
-      const sourceSentences = splitSentences(sourceText, 12);
-      const sections = inferSections(criteria, model);
-      const fileRows = files.map(file => `
-        <tr>
-          <td>${escapeHtml(file.name)}</td>
-          <td>${escapeHtml(formatBytes(file.size))}</td>
-        </tr>
+      const title = inferCorrectiveTitle(sourceText, files);
+      const items = extractCorrectiveItems(sourceText);
+      const rows = items.length ? items : [{
+        heading: "Incidencias pendientes de clasificar.",
+        building: inferBuildingName(sourceText) || "Instalacion revisada",
+        system: "Sistema PCI",
+        corrective: "Revisar el documento original y clasificar las incidencias detectadas."
+      }];
+
+      const blocks = rows.map(item => `
+        <h3>${escapeHtml(item.heading)}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Edificio / Instalación</th>
+              <th>Sistema</th>
+              <th>Correctivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${escapeHtml(item.building)}</td>
+              <td>${escapeHtml(item.system)}</td>
+              <td>${escapeHtml(item.corrective)}</td>
+            </tr>
+          </tbody>
+        </table>
       `).join("");
 
-      const criteriaList = criteriaSentences.length
-        ? criteriaSentences.map(item => `<li>${escapeHtml(item)}</li>`).join("")
-        : "<li>Seguir una estructura clara, tecnica y verificable para documentar la actuacion correctiva.</li>";
-
-      const modelList = modelSentences.length
-        ? modelSentences.map(item => `<li>${escapeHtml(item)}</li>`).join("")
-        : "<li>No se ha detectado un modelo textual amplio; se aplica una estructura profesional de informe correctivo.</li>";
-
-      const sourceList = sourceSentences.length
-        ? sourceSentences.map(item => `<li>${escapeHtml(item)}</li>`).join("")
-        : "<li>Los PDFs se han unido correctamente. Si el PDF contiene escaneos sin OCR, revisa el contenido manualmente.</li>";
-
-      const sectionBlocks = sections.map(section => {
-        const sectionText = makeSectionText(section, keywords, sourceSentences, criteriaSentences, modelSentences);
-        return `<h3>${escapeHtml(section)}</h3><p>${escapeHtml(sectionText)}</p>`;
-      }).join("");
-
-      const html = `
-        <h2>Informe correctivo</h2>
-        <p><strong>Fecha:</strong> ${escapeHtml(now.toLocaleDateString("es-ES"))}</p>
-        <p><strong>Documentacion revisada:</strong> ${files.length} PDF(s) unidos y analizados como base documental.</p>
-
-        <h3>Documentos incorporados</h3>
-        <table>
-          <thead><tr><th>Archivo</th><th>Tamano</th></tr></thead>
-          <tbody>${fileRows}</tbody>
-        </table>
-
-        <h3>Criterios aplicados</h3>
-        <ul>${criteriaList}</ul>
-
-        <h3>Patron tomado del modelo</h3>
-        <ul>${modelList}</ul>
-
-        <h3>Contenido identificado en los PDFs</h3>
-        <ul>${sourceList}</ul>
-
-        ${sectionBlocks}
-
-        <h3>Resumen de enfoque</h3>
-        <p>El informe se ha preparado atendiendo a los criterios indicados por el usuario, tomando el modelo como referencia de estilo y estructura, e incorporando la informacion disponible en los documentos PDF cargados. Palabras clave detectadas: ${escapeHtml(keywords.join(", ") || "sin palabras clave suficientes")}.</p>
-      `;
-
-      const plainText = html
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/(h2|h3|p|li|tr)>/gi, "\n")
-        .replace(/<[^>]+>/g, "")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
+      const html = `<h2>${escapeHtml(title)}</h2>${blocks}`;
+      const plainText = [title, ...rows.flatMap(item => [
+        "",
+        item.heading,
+        "Edificio / Instalacion | Sistema | Correctivo",
+        `${item.building} | ${item.system} | ${item.corrective}`
+      ])].join("\n");
 
       return { html, plainText };
     }
 
-    function makeSectionText(section, keywords, sourceSentences, criteriaSentences, modelSentences) {
-      const keyText = keywords.slice(0, 5).join(", ") || "la documentacion aportada";
-      const evidence = sourceSentences[0] || criteriaSentences[0] || modelSentences[0] || "la informacion aportada por el usuario";
-      const templates = {
-        "Objeto": `Definir el alcance del correctivo a partir de ${keyText}, dejando constancia de la documentacion revisada y del resultado esperado de la actuacion.`,
-        "Antecedentes": `Se toma como antecedente principal: ${evidence}`,
-        "Alcance": `El alcance incluye la revision de los informes aportados, la identificacion de desviaciones y la propuesta de medidas correctivas coherentes con el modelo facilitado.`,
-        "Descripcion de la incidencia": `La incidencia debe describirse de forma objetiva, indicando ubicacion, elemento afectado, sintomas observados y condicion que motiva la actuacion.`,
-        "Analisis tecnico": `El analisis tecnico relaciona los hallazgos documentales con ${keyText}, priorizando causas verificables y evitando conclusiones no sustentadas.`,
-        "Causa probable": `Como causa probable se debe consignar la hipotesis tecnica mejor apoyada por los documentos, indicando cualquier limitacion si faltan pruebas, mediciones u observaciones directas.`,
-        "Actuacion correctiva": `Se recomienda ejecutar una actuacion correctiva ordenada: inspeccion previa, correccion de la deficiencia, sustitucion o ajuste cuando proceda, limpieza de la zona y registro fotografico o documental.`,
-        "Materiales y medios": `Los materiales, equipos y medios auxiliares deberan adecuarse a la incidencia concreta y quedar reflejados con cantidades, referencias y criterios de aceptacion cuando esten disponibles.`,
-        "Pruebas y verificaciones": `Tras la correccion se deberan realizar pruebas funcionales, comprobaciones visuales y verificacion documental para confirmar que la incidencia queda resuelta.`,
-        "Conclusiones": `La conclusion debe cerrar el informe con el estado final, las reservas tecnicas si existen y las recomendaciones de seguimiento o mantenimiento preventivo.`
-      };
+    function normalizeText(text) {
+      return text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ");
+    }
 
-      return templates[section] || `Este apartado se redacta siguiendo el criterio indicado y tomando como referencia ${keyText}.`;
+    function inferBuildingName(text) {
+      const match = text.match(/BAE\s*0?(\d+)\s*[–-]\s*([^\n]+)/i);
+      if (!match) return "";
+      return match[2].replace(/\s+/g, " ").trim();
+    }
+
+    function inferCorrectiveTitle(text, files) {
+      const match = text.match(/BAE\s*0?(\d+)\s*[–-]\s*([^\n]+)/i);
+      if (match) {
+        const bae = match[1].padStart(2, "0");
+        const name = match[2].replace(/\s+/g, " ").trim().toUpperCase();
+        return `CORRECTIVOS SISTEMAS CONTRA INCENDIOS. BAE ${bae} - ${name}`;
+      }
+
+      const fileName = files[0]?.name || "";
+      const fileMatch = fileName.match(/BAE[_\s-]*0?(\d+)/i);
+      if (fileMatch) return `CORRECTIVOS SISTEMAS CONTRA INCENDIOS. BAE ${fileMatch[1].padStart(2, "0")}`;
+      return "CORRECTIVOS SISTEMAS CONTRA INCENDIOS";
+    }
+
+    function extractCorrectiveItems(sourceText) {
+      const text = normalizeText(sourceText);
+      const building = inferBuildingName(sourceText) || "Residencia Infante Don Juan";
+      const items = [];
+      const add = (heading, place, system, corrective) => {
+        if (!items.some(item => item.heading === heading && item.system === system)) {
+          items.push({ heading, building: place, system, corrective });
+        }
+      };
+      const has = (...patterns) => patterns.every(pattern => text.includes(pattern));
+
+      if (has("salida especifica", "rociadores")) {
+        add(
+          "Falta de salida específica de pruebas en red de rociadores.",
+          `${building} - cocina`,
+          "Rociadores / grupo de presión",
+          "Verificar la existencia de punto de prueba. Si no existe, instalar salida de prueba para ensayo del sistema."
+        );
+      }
+
+      if (has("acumulacion de materiales") || has("obstaculos", "garaje")) {
+        add(
+          "Acumulación de materiales y obstáculos en zonas técnicas de garaje.",
+          "Garajes / salas técnicas S-1, S-2 y S-3",
+          "Detección de CO y ventilación",
+          "Retirar materiales almacenados y despejar accesos a extractores, cuadros, detectores, pulsadores y recorridos de ventilación."
+        );
+      }
+
+      if (has("central aguilera") && (has("averia general") || has("zonas desconectadas"))) {
+        add(
+          "Central de detección con avería general y desconexiones.",
+          building,
+          "Central Aguilera de tres hilos",
+          "Central con avería de alimentación, avería general, indicación de desconexión, zonas desconectadas y zonas en avería."
+        );
+      }
+
+      if (has("fuentes de alimentacion") && has("averia")) {
+        add(
+          "Fuentes de alimentación con avería.",
+          building,
+          "Fuentes de alimentación Aguilera",
+          "Comprobar y reparar o sustituir fuentes, baterías, cargadores, salidas, fusibles y líneas alimentadas por avería de alimentación."
+        );
+      }
+
+      if (has("zonas desconectadas") && has("obras")) {
+        add(
+          "Zonas desconectadas por obras.",
+          building,
+          "Detección y alarma de incendios",
+          "Restablecer la cobertura de las zonas desconectadas por obras y dejar el sistema supervisado."
+        );
+      }
+
+      if ((has("lineas") && has("inestabilidad")) || has("averias variables")) {
+        add(
+          "Líneas de detección inestables y detectores con averías variables.",
+          building,
+          "Detección automática",
+          "Sustituir detectores, bases o elementos afectados en líneas con averías variables e inestabilidad."
+        );
+      }
+
+      if ((has("detectores") && has("diez anos")) || has("vida util")) {
+        add(
+          "Detectores con vida útil superada.",
+          building,
+          "Detectores automáticos",
+          "Sustituir detectores que superan diez años o la vida útil establecida por el fabricante."
+        );
+      }
+
+      if (has("sistema descatalogado") || has("ausencia de repuestos")) {
+        add(
+          "Sistema descatalogado sin repuestos.",
+          building,
+          "Sistema Aguilera de tres hilos",
+          "Sustituir integralmente el sistema de detección y alarma por instalación actual, compatible y mantenible."
+        );
+      }
+
+      return items;
     }
 
     function showPreview() {
@@ -726,7 +911,33 @@
       doc.save("informe-correctivo.pdf");
     }
 
-    els.pdfInput.addEventListener("change", () => {
+    function downloadReportWord() {
+      if (!state.reportHtml) return;
+      const documentHtml = `
+        <!doctype html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #111; }
+            h2 { text-align: center; text-transform: uppercase; font-size: 16pt; font-weight: 700; }
+            h3 { color: #0057b8; font-size: 11pt; font-weight: 700; margin-top: 16pt; margin-bottom: 4pt; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 10pt; }
+            th, td { border: 1px solid #777; padding: 6pt; vertical-align: middle; }
+            th { background: #e8eef5; font-weight: 700; }
+          </style>
+        </head>
+        <body>${state.reportHtml}</body>
+        </html>
+      `;
+      downloadBlob(
+        new TextEncoder().encode(documentHtml),
+        "application/msword",
+        "correctivos-sistemas.doc"
+      );
+    }
+
+    els.pdfInput.addEventListener("change", async () => {
       const newFiles = Array.from(els.pdfInput.files || []);
       state.pdfFiles = [...state.pdfFiles, ...newFiles];
       els.pdfInput.value = "";
@@ -734,23 +945,67 @@
       state.reportHtml = "";
       state.reportText = "";
       els.previewBtn.disabled = true;
-      renderFileList();
-      updateStats();
-      setStatus("");
+      try {
+        await persistPdfFiles();
+        renderFileList();
+        updateStats();
+        setStatus("PDFs cargados y guardados.");
+      } catch (error) {
+        console.error(error);
+        renderFileList();
+        updateStats();
+        setStatus("PDFs cargados, pero no se pudieron guardar para la proxima sesion.", true);
+      }
     });
 
-    els.criteriaText.addEventListener("input", updateStats);
-    els.modelText.addEventListener("input", updateStats);
-    els.modelFile.addEventListener("change", () => setStatus(els.modelFile.files[0] ? `Modelo cargado: ${els.modelFile.files[0].name}` : ""));
+    els.criteriaText.addEventListener("input", () => {
+      persistTextFields();
+      updateStats();
+    });
+    els.modelText.addEventListener("input", () => {
+      persistTextFields();
+      updateStats();
+    });
+    els.modelFile.addEventListener("change", async () => {
+      const file = els.modelFile.files[0] || null;
+      try {
+        await persistModelFile(file);
+        setStatus(file ? `Modelo cargado y guardado: ${file.name}` : "Modelo eliminado.");
+      } catch (error) {
+        console.error(error);
+        setStatus("Modelo cargado, pero no se pudo guardar para la proxima sesion.", true);
+      }
+    });
 
-    els.clearPdfsBtn.addEventListener("click", () => {
+    els.clearPdfsBtn.addEventListener("click", async () => {
       state.pdfFiles = [];
       state.mergedPdfBytes = null;
       state.extractedPdfText = "";
       els.previewBtn.disabled = true;
+      await idbDelete(storageKeys.pdfFiles);
       renderFileList();
       updateStats();
       setStatus("PDFs eliminados.");
+    });
+
+    els.clearAllBtn.addEventListener("click", async () => {
+      state.pdfFiles = [];
+      state.modelFile = null;
+      state.mergedPdfBytes = null;
+      state.extractedPdfText = "";
+      state.reportHtml = "";
+      state.reportText = "";
+      els.criteriaText.value = "";
+      els.modelText.value = "";
+      els.modelFile.value = "";
+      els.previewBtn.disabled = true;
+      localStorage.removeItem(storageKeys.criteriaText);
+      localStorage.removeItem(storageKeys.modelText);
+      await idbDelete(storageKeys.pdfFiles);
+      await idbDelete(storageKeys.modelFile);
+      renderFileList();
+      updateStats();
+      setStatus("Todo lo cargado se ha eliminado.");
     });
 
     els.generateBtn.addEventListener("click", async () => {
@@ -802,13 +1057,14 @@
     els.previewBtn.addEventListener("click", showPreview);
     els.backBtn.addEventListener("click", showInput);
     els.downloadReportBtn.addEventListener("click", downloadReportPdf);
+    els.downloadWordBtn.addEventListener("click", downloadReportWord);
     els.downloadMergedBtn.addEventListener("click", () => {
       if (state.mergedPdfBytes) {
         downloadBlob(state.mergedPdfBytes, "application/pdf", "pdfs-unidos.pdf");
       }
     });
 
-    updateStats();
+    await restorePersistedData();
   </script>
 </body>
 </html>

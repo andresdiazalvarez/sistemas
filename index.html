@@ -9,13 +9,13 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <style>
     :root {
-      --lime: #baff00;
-      --lime-strong: #8fc900;
+      --lime: #d7ff00;
+      --lime-strong: #a8df00;
       --ink: #10140d;
       --muted: #58604d;
       --paper: #fbfff2;
-      --panel: #f2ffd0;
-      --line: #d3ef68;
+      --panel: #f6ffc7;
+      --line: #cfff2e;
       --danger: #b42318;
       --shadow: 0 18px 50px rgba(80, 120, 0, .18);
     }
@@ -28,7 +28,7 @@
       font-family: Arial, Helvetica, sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(186, 255, 0, .4), transparent 34rem),
+        radial-gradient(circle at top left, rgba(215, 255, 0, .48), transparent 34rem),
         linear-gradient(135deg, #f8ffe6 0%, #ffffff 45%, #efffc2 100%);
     }
 
@@ -279,7 +279,7 @@
     }
 
     .report th {
-      background: #efffb5;
+      background: #f1ff9a;
     }
 
     .pill {
@@ -703,7 +703,7 @@
       const lines = doc.splitTextToSize(state.reportText, maxWidth);
       let y = margin;
 
-      doc.setFillColor(186, 255, 0);
+      doc.setFillColor(215, 255, 0);
       doc.rect(0, 0, 595, 20, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
@@ -715,7 +715,7 @@
       for (const line of lines) {
         if (y > 800) {
           doc.addPage();
-          doc.setFillColor(186, 255, 0);
+          doc.setFillColor(215, 255, 0);
           doc.rect(0, 0, 595, 20, "F");
           y = margin;
         }

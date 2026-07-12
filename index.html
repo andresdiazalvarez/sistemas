@@ -474,14 +474,43 @@
       modelFile: "modelFile"
     };
 
-    const dbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open("sistemas-correctivos", 1);
-      request.onupgradeneeded = () => {
-        request.result.createObjectStore("uploads");
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    const storageAvailable = {
+      local: false,
+      indexedDb: false
+    };
+
+    let dbPromise = Promise.resolve(null);
+
+    try {
+      const testKey = "__sistemas_storage_test__";
+      localStorage.setItem(testKey, "1");
+      localStorage.removeItem(testKey);
+      storageAvailable.local = true;
+    } catch (error) {
+      storageAvailable.local = false;
+    }
+
+    if ("indexedDB" in window) {
+      dbPromise = new Promise((resolve) => {
+        try {
+          const request = indexedDB.open("sistemas-correctivos", 2);
+          request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains("uploads")) {
+              db.createObjectStore("uploads");
+            }
+          };
+          request.onsuccess = () => {
+            storageAvailable.indexedDb = true;
+            resolve(request.result);
+          };
+          request.onerror = () => resolve(null);
+          request.onblocked = () => resolve(null);
+        } catch (error) {
+          resolve(null);
+        }
+      });
+    }
 
     function setStatus(message, isError = false) {
       els.status.textContent = message;
@@ -536,6 +565,7 @@
 
     async function idbPut(key, value) {
       const db = await dbPromise;
+      if (!db) return;
       return new Promise((resolve, reject) => {
         const tx = db.transaction("uploads", "readwrite");
         tx.objectStore("uploads").put(value, key);
@@ -546,6 +576,7 @@
 
     async function idbGet(key) {
       const db = await dbPromise;
+      if (!db) return null;
       return new Promise((resolve, reject) => {
         const tx = db.transaction("uploads", "readonly");
         const request = tx.objectStore("uploads").get(key);
@@ -556,6 +587,7 @@
 
     async function idbDelete(key) {
       const db = await dbPromise;
+      if (!db) return;
       return new Promise((resolve, reject) => {
         const tx = db.transaction("uploads", "readwrite");
         tx.objectStore("uploads").delete(key);
@@ -595,13 +627,24 @@
     }
 
     function persistTextFields() {
-      localStorage.setItem(storageKeys.criteriaText, els.criteriaText.value);
-      localStorage.setItem(storageKeys.modelText, els.modelText.value);
+      if (!storageAvailable.local) return;
+      try {
+        localStorage.setItem(storageKeys.criteriaText, els.criteriaText.value);
+        localStorage.setItem(storageKeys.modelText, els.modelText.value);
+      } catch (error) {
+        storageAvailable.local = false;
+      }
     }
 
     async function restorePersistedData() {
-      els.criteriaText.value = localStorage.getItem(storageKeys.criteriaText) || "";
-      els.modelText.value = localStorage.getItem(storageKeys.modelText) || "";
+      if (storageAvailable.local) {
+        try {
+          els.criteriaText.value = localStorage.getItem(storageKeys.criteriaText) || "";
+          els.modelText.value = localStorage.getItem(storageKeys.modelText) || "";
+        } catch (error) {
+          storageAvailable.local = false;
+        }
+      }
 
       try {
         const storedPdfs = await idbGet(storageKeys.pdfFiles);
@@ -999,8 +1042,14 @@
       els.modelText.value = "";
       els.modelFile.value = "";
       els.previewBtn.disabled = true;
-      localStorage.removeItem(storageKeys.criteriaText);
-      localStorage.removeItem(storageKeys.modelText);
+      if (storageAvailable.local) {
+        try {
+          localStorage.removeItem(storageKeys.criteriaText);
+          localStorage.removeItem(storageKeys.modelText);
+        } catch (error) {
+          storageAvailable.local = false;
+        }
+      }
       await idbDelete(storageKeys.pdfFiles);
       await idbDelete(storageKeys.modelFile);
       renderFileList();

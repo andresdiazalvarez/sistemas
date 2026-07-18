@@ -498,6 +498,7 @@
         state.current.number = Number(state.current.number || state.nextNumber || 1);
         state.current.header = state.current.header || "";
         state.current.systems = state.current.systems || {};
+        state.current.editingId = state.current.editingId || null;
         state.fixedTexts = state.fixedTexts || {};
         state.savedReports = Array.isArray(state.savedReports) ? state.savedReports : [];
         return state;
@@ -574,6 +575,7 @@
             <div class="saved-title">Informe ${report.number}</div>
             <div class="saved-meta">${escapeHtml((report.header || "").toUpperCase())}<br>${report.systems.length} sistema(s) grabado(s)</div>
             <div class="button-row">
+              <button class="btn pink" type="button" data-action="open" data-id="${report.id}">Abrir / rectificar</button>
               <button class="btn green" type="button" data-action="pdf" data-id="${report.id}">PDF</button>
               <button class="btn blue" type="button" data-action="word" data-id="${report.id}">Word</button>
               <button class="btn red" type="button" data-action="delete" data-id="${report.id}">Borrar</button>
@@ -747,12 +749,16 @@
         return;
       }
 
-      const existingIndex = appState.savedReports.findIndex(report => report.number === appState.current.number);
+      const existingIndex = appState.savedReports.findIndex(report =>
+        (appState.current.editingId && report.id === appState.current.editingId) ||
+        (!appState.current.editingId && report.number === appState.current.number)
+      );
       const report = {
         id: existingIndex >= 0 ? appState.savedReports[existingIndex].id : makeId(),
         number: appState.current.number,
         header: appState.current.header,
         systems,
+        sourceSystems: cloneData(appState.current.systems),
         createdAt: new Date().toISOString()
       };
 
@@ -763,7 +769,8 @@
       appState.current = {
         number: appState.nextNumber,
         header: "",
-        systems: {}
+        systems: {},
+        editingId: null
       };
       appState.nextNumber += 1;
       saveState();
@@ -824,11 +831,50 @@
       return `report-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
+    function cloneData(value) {
+      return JSON.parse(JSON.stringify(value || {}));
+    }
+
+    function systemsFromSavedReport(report) {
+      if (report.sourceSystems) return cloneData(report.sourceSystems);
+
+      const systems = {};
+      (report.systems || []).forEach(item => {
+        const sections = {};
+        SECTIONS.forEach(section => {
+          sections[section] = emptySection();
+        });
+        sections[SECTIONS[0]].voice = item.text || "";
+        systems[item.name] = {
+          sections,
+          photos: item.photos || [],
+          mountedHtml: item.html || "",
+          mountedText: item.text || ""
+        };
+      });
+      return systems;
+    }
+
+    function openSavedReport(report) {
+      appState.current = {
+        number: report.number,
+        header: report.header || "",
+        systems: systemsFromSavedReport(report),
+        editingId: report.id
+      };
+      appState.nextNumber = Math.max(Number(appState.nextNumber || 1), Number(report.number || 0) + 1);
+      saveState();
+      renderHome();
+      setStatus(els.homeStatus, `Informe ${report.number} abierto para rectificar.`);
+      showScreen("homeScreen");
+    }
+
     function clearCurrentReport() {
       appState.current = {
         number: appState.current.number || appState.nextNumber || 1,
         header: "",
-        systems: {}
+        systems: {},
+        editingId: null
       };
       saveState();
       renderHome();
@@ -963,9 +1009,20 @@
 
       if (button.dataset.action === "delete") {
         appState.savedReports = appState.savedReports.filter(item => item.id !== report.id);
+        if (appState.current.editingId === report.id) {
+          appState.current = {
+            number: appState.nextNumber || 1,
+            header: "",
+            systems: {},
+            editingId: null
+          };
+        }
         saveState();
         renderHome();
         setStatus(els.homeStatus, `Informe ${report.number} borrado.`);
+      }
+      if (button.dataset.action === "open") {
+        openSavedReport(report);
       }
       if (button.dataset.action === "word") {
         downloadWord(buildFullHtml(report), `informe-${report.number}.doc`);

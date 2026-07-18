@@ -5,6 +5,7 @@ App estatica para crear informes tecnicos de sistemas PCI desde GitHub Pages.
 ## Funciones
 
 - Informes numerados y guardados en el navegador.
+- Informes guardados con opcion de abrir, rectificar y volver a grabar.
 - Cabecera del informe en mayusculas.
 - Sistemas:
   - Central de Deteccion de Incendios

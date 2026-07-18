@@ -1,10 +1,10 @@
 CONTENIDO DEL PAQUETE
 
 - index.html
-  App completa. Incluye estructura, estilos verde limon, union de PDFs y generacion de correctivos.
+  App completa SISTEMAS.
 
 - README.md
-  Explicacion para GitHub.
+  Resumen de funcionamiento.
 
 - .nojekyll
   Archivo recomendado para GitHub Pages.
@@ -12,7 +12,7 @@ CONTENIDO DEL PAQUETE
 
 COMO SUBIRLO
 
-Sube todo el contenido de esta carpeta a la raiz de un repositorio de GitHub.
+Sube todo el contenido de esta carpeta a la raiz del repositorio de GitHub.
 Despues activa GitHub Pages desde Settings > Pages.
 
 
@@ -20,6 +20,4 @@ IMPORTANTE
 
 No borres index.html. Es el archivo que GitHub Pages abre como pagina principal.
 
-La descarga principal del informe es Word. Tambien hay descarga en PDF.
-
-Los PDFs, criterios y modelo quedan guardados en el navegador hasta pulsar eliminar.
+Los informes quedan guardados en el navegador hasta que se borren desde la app.

@@ -12,6 +12,7 @@
       --pink: #ff4fa3;
       --green: #22a447;
       --blue: #1266d6;
+      --violet: #7c3aed;
       --red: #d92d20;
       --ink: #10140d;
       --muted: #5b6252;
@@ -124,6 +125,7 @@
     .btn.pink { background: var(--pink); border-color: #d93686; color: #fff; }
     .btn.green { background: var(--green); border-color: #15803d; color: #fff; }
     .btn.blue { background: var(--blue); border-color: #0b56b4; color: #fff; }
+    .btn.violet { background: var(--violet); border-color: #5b21b6; color: #fff; }
     .btn.red { background: var(--red); border-color: #b42318; color: #fff; }
 
     .report-number {
@@ -443,6 +445,7 @@
           <div class="button-row">
             <div id="currentReportNumber" class="report-number">Informe 1</div>
             <button id="saveCurrentBtn" class="btn pink" type="button">Grabar</button>
+            <button id="viewAllBtn" class="btn violet" type="button">Ver conjunto</button>
           </div>
           <div class="button-row">
             <button id="downloadAllPdfBtn" class="btn green" type="button">Descargar todo en PDF</button>
@@ -515,7 +518,8 @@
         <div id="photoContainer" class="photos"></div>
 
         <div class="button-row" style="margin-top: 18px;">
-          <button id="mountBtn" class="btn lime" type="button">Montar</button>
+          <button id="saveEntryBtn" class="btn green" type="button">Grabar</button>
+          <button id="viewEntryBtn" class="btn violet" type="button">Ver</button>
         </div>
         <div id="systemStatus" class="status" aria-live="polite"></div>
       </div>
@@ -582,6 +586,7 @@
     let appState = loadState();
     let activeSystem = "";
     let activeEntryId = "";
+    let previewMode = "entry";
     let activeRecognition = null;
 
     const els = {
@@ -1256,32 +1261,75 @@
       return appState.savedReports.find(report => report.id === id);
     }
 
+    function viewCurrentEntry() {
+      previewMode = "entry";
+      const report = buildSystemReport(activeEntryId);
+      els.mountedPreview.innerHTML = report.html;
+      els.previewSubtitle.textContent = activeSystem;
+      setStatus(els.previewStatus, "");
+      showScreen("previewScreen");
+    }
+
+    function viewCurrentSet() {
+      previewMode = "set";
+      const report = makeCurrentReportSnapshot();
+      if (!report.systems.length) {
+        setStatus(els.homeStatus, "No hay sistemas preparados para ver.", true);
+        return;
+      }
+      els.mountedPreview.innerHTML = buildFullHtml(report);
+      els.previewSubtitle.textContent = `Informe ${appState.current.number}`;
+      setStatus(els.previewStatus, "");
+      showScreen("previewScreen");
+    }
+
+    function saveCurrentEntry() {
+      buildSystemReport(activeEntryId);
+      saveState();
+      renderHome();
+      setStatus(els.homeStatus, `${activeSystem} grabado.`);
+      showScreen("homeScreen");
+    }
+
     document.getElementById("saveCurrentBtn").addEventListener("click", saveCurrentReport);
+    document.getElementById("viewAllBtn").addEventListener("click", viewCurrentSet);
     document.getElementById("deleteCurrentBtn").addEventListener("click", clearCurrentReport);
     document.getElementById("backFromSystemBtn").addEventListener("click", () => {
       saveSystemInputs();
       renderHome();
       showScreen("homeScreen");
     });
-    document.getElementById("backFromPreviewBtn").addEventListener("click", () => renderEntry(activeEntryId));
-    document.getElementById("mountBtn").addEventListener("click", () => {
-      buildSystemReport(activeEntryId);
-      const report = makeCurrentReportSnapshot();
-      els.mountedPreview.innerHTML = buildFullHtml(report);
-      els.previewSubtitle.textContent = `Informe ${appState.current.number}`;
-      setStatus(els.previewStatus, "");
-      showScreen("previewScreen");
+    document.getElementById("backFromPreviewBtn").addEventListener("click", () => {
+      if (previewMode === "set") {
+        renderHome();
+        showScreen("homeScreen");
+      } else {
+        renderEntry(activeEntryId);
+      }
     });
-    document.getElementById("saveMountedBtn").addEventListener("click", saveCurrentReport);
+    document.getElementById("saveEntryBtn").addEventListener("click", saveCurrentEntry);
+    document.getElementById("viewEntryBtn").addEventListener("click", viewCurrentEntry);
+    document.getElementById("saveMountedBtn").addEventListener("click", () => {
+      if (previewMode === "entry") saveCurrentEntry();
+      else saveCurrentReport();
+    });
     document.getElementById("downloadMountedWordBtn").addEventListener("click", () => {
-      buildSystemReport(activeEntryId);
-      const report = makeCurrentReportSnapshot();
-      downloadWord(buildFullHtml(report), `informe-${appState.current.number}.doc`);
+      if (previewMode === "entry") {
+        const report = buildSystemReport(activeEntryId);
+        downloadWord(report.html, `informe-${appState.current.number}-${activeSystem}.doc`);
+      } else {
+        const report = makeCurrentReportSnapshot();
+        downloadWord(buildFullHtml(report), `informe-${appState.current.number}.doc`);
+      }
     });
     document.getElementById("downloadMountedPdfBtn").addEventListener("click", () => {
-      buildSystemReport(activeEntryId);
-      const report = makeCurrentReportSnapshot();
-      downloadPdfFromText(buildFullText(report), `informe-${appState.current.number}.pdf`);
+      if (previewMode === "entry") {
+        const report = buildSystemReport(activeEntryId);
+        downloadPdfFromText(report.text, `informe-${appState.current.number}-${activeSystem}.pdf`);
+      } else {
+        const report = makeCurrentReportSnapshot();
+        downloadPdfFromText(buildFullText(report), `informe-${appState.current.number}.pdf`);
+      }
     });
     document.getElementById("clearMountedBtn").addEventListener("click", clearCurrentReport);
     document.getElementById("downloadAllPdfBtn").addEventListener("click", () => {

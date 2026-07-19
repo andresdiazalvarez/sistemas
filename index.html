@@ -168,6 +168,45 @@
       white-space: normal;
     }
 
+    .short-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .prepared-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .prepared-item {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .76);
+      padding: 10px 12px;
+    }
+
+    .prepared-item strong {
+      display: block;
+    }
+
+    .prepared-item span {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
     .saved-list {
       display: grid;
       gap: 10px;
@@ -289,6 +328,44 @@
       margin: 0 0 16px;
     }
 
+    .doc .doc-revision-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 0 0 12px;
+      font-size: 11pt;
+    }
+
+    .doc .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 18px;
+      font-size: 11pt;
+    }
+
+    .doc .summary-table th,
+    .doc .summary-table td {
+      border: 1px solid #222;
+      padding: 4px 6px;
+      vertical-align: middle;
+    }
+
+    .doc .summary-client {
+      background: #d4c4f0;
+      text-align: left;
+      font-weight: 700;
+    }
+
+    .doc .summary-head {
+      background: #ae93e4;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .doc .summary-table td {
+      background: #e5dcf5;
+    }
+
     .doc h3 {
       font-size: 11.5pt;
       margin: 14px 0 6px;
@@ -337,7 +414,8 @@
     @media (max-width: 980px) {
       .systems, .photos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .saved-item { grid-template-columns: 1fr; }
-      .two-fields { grid-template-columns: 1fr; }
+      .two-fields, .short-fields, .meta-grid { grid-template-columns: 1fr; }
+      .prepared-item { grid-template-columns: 1fr; }
       .toolbar { align-items: flex-start; flex-direction: column; }
     }
 
@@ -378,8 +456,20 @@
           <input id="reportHeader" type="text" placeholder="Ejemplo: BAE 06 - RESIDENCIA INFANTE DON JUAN">
         </div>
 
+        <div class="short-fields">
+          <div class="field">
+            <label for="revisionNumber">Nº revisión</label>
+            <input id="revisionNumber" type="text" value="1 RT-2026">
+          </div>
+          <div class="field">
+            <label for="revisionText">Revisión</label>
+            <input id="revisionText" type="text" value="TRIMESTRAL">
+          </div>
+        </div>
+
         <h2 id="homeTitle">Sistemas</h2>
         <div id="systemButtons" class="systems"></div>
+        <div id="preparedEntries" class="prepared-list"></div>
         <div id="homeStatus" class="status" aria-live="polite"></div>
       </div>
 
@@ -397,6 +487,26 @@
             <p id="systemSubtitle" class="subhead"></p>
           </div>
           <button id="backFromSystemBtn" class="btn" type="button">Volver</button>
+        </div>
+
+        <h2>Datos del cuadro resumen</h2>
+        <div class="meta-grid">
+          <div class="field">
+            <label for="metaClient">Cliente</label>
+            <input id="metaClient" type="text" placeholder="Cliente">
+          </div>
+          <div class="field">
+            <label for="metaBuilding">Edificio</label>
+            <input id="metaBuilding" type="text" placeholder="Edificio">
+          </div>
+          <div class="field">
+            <label for="metaSystem">Sistema</label>
+            <input id="metaSystem" type="text" placeholder="Sistema">
+          </div>
+          <div class="field">
+            <label for="metaDenomination">Denominación</label>
+            <input id="metaDenomination" type="text" placeholder="Denominación">
+          </div>
         </div>
 
         <div id="sectionContainer"></div>
@@ -460,7 +570,10 @@
       current: {
         number: 1,
         header: "",
-        systems: {}
+        revisionNumber: "1 RT-2026",
+        revisionText: "TRIMESTRAL",
+        systems: {},
+        entries: []
       },
       fixedTexts: {},
       savedReports: []
@@ -468,6 +581,7 @@
 
     let appState = loadState();
     let activeSystem = "";
+    let activeEntryId = "";
     let activeRecognition = null;
 
     const els = {
@@ -476,13 +590,20 @@
       previewScreen: document.getElementById("previewScreen"),
       currentReportNumber: document.getElementById("currentReportNumber"),
       reportHeader: document.getElementById("reportHeader"),
+      revisionNumber: document.getElementById("revisionNumber"),
+      revisionText: document.getElementById("revisionText"),
       systemButtons: document.getElementById("systemButtons"),
+      preparedEntries: document.getElementById("preparedEntries"),
       savedReports: document.getElementById("savedReports"),
       homeStatus: document.getElementById("homeStatus"),
       systemTitle: document.getElementById("systemTitle"),
       systemSubtitle: document.getElementById("systemSubtitle"),
       sectionContainer: document.getElementById("sectionContainer"),
       photoContainer: document.getElementById("photoContainer"),
+      metaClient: document.getElementById("metaClient"),
+      metaBuilding: document.getElementById("metaBuilding"),
+      metaSystem: document.getElementById("metaSystem"),
+      metaDenomination: document.getElementById("metaDenomination"),
       systemStatus: document.getElementById("systemStatus"),
       mountedPreview: document.getElementById("mountedPreview"),
       previewSubtitle: document.getElementById("previewSubtitle"),
@@ -497,7 +618,10 @@
         state.current = state.current || { number: state.nextNumber, header: "", systems: {} };
         state.current.number = Number(state.current.number || state.nextNumber || 1);
         state.current.header = state.current.header || "";
+        state.current.revisionNumber = (state.current.revisionNumber || "1 RT-2026").toUpperCase();
+        state.current.revisionText = (state.current.revisionText || "TRIMESTRAL").toUpperCase();
         state.current.systems = state.current.systems || {};
+        state.current.entries = Array.isArray(state.current.entries) ? state.current.entries : entriesFromSystems(state.current.systems);
         state.current.editingId = state.current.editingId || null;
         state.fixedTexts = state.fixedTexts || {};
         state.savedReports = Array.isArray(state.savedReports) ? state.savedReports : [];
@@ -535,23 +659,62 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    function ensureSystem(system) {
-      if (!appState.current.systems[system]) {
-        appState.current.systems[system] = {
-          sections: {},
-          photos: [],
-          mountedHtml: "",
-          mountedText: ""
-        };
+    function makeEntry(system) {
+      return {
+        id: makeId(),
+        type: system,
+        meta: {
+          client: appState.current.header || "",
+          building: "",
+          system,
+          denomination: system
+        },
+        sections: {},
+        photos: [],
+        mountedHtml: "",
+        mountedText: ""
+      };
+    }
+
+    function entriesFromSystems(systems) {
+      return Object.entries(systems || {}).map(([system, data]) => ({
+        id: makeId(),
+        type: system,
+        meta: {
+          client: "",
+          building: "",
+          system,
+          denomination: system
+        },
+        sections: data.sections || {},
+        photos: data.photos || [],
+        mountedHtml: data.mountedHtml || "",
+        mountedText: data.mountedText || ""
+      }));
+    }
+
+    function ensureEntry(entryId) {
+      let target = appState.current.entries.find(entry => entry.id === entryId);
+      if (!target) {
+        target = makeEntry(activeSystem || SYSTEMS[0]);
+        appState.current.entries.push(target);
+        activeEntryId = target.id;
       }
 
-      const target = appState.current.systems[system];
+      if (!target.meta) {
+        target.meta = {
+          client: appState.current.header || "",
+          building: "",
+          system: target.type,
+          denomination: target.type
+        };
+      }
       SECTIONS.forEach(section => {
         if (!target.sections[section]) target.sections[section] = emptySection();
-        if (!appState.fixedTexts[system]) appState.fixedTexts[system] = {};
-        if (!appState.fixedTexts[system][section]) appState.fixedTexts[system][section] = "";
+        if (!appState.fixedTexts[target.type]) appState.fixedTexts[target.type] = {};
+        if (!appState.fixedTexts[target.type][section]) appState.fixedTexts[target.type][section] = "";
         if (!target.sections[section].fixed) {
-          target.sections[section].fixed = appState.fixedTexts[system][section];
+          target.sections[section].fixed = appState.fixedTexts[target.type][section];
         }
       });
 
@@ -561,16 +724,35 @@
     }
 
     function renderHome() {
+      normalizeSavedReports();
       appState.current.number = appState.current.number || appState.nextNumber || 1;
       els.currentReportNumber.textContent = `Informe ${appState.current.number}`;
       els.reportHeader.value = appState.current.header || "";
+      els.revisionNumber.value = (appState.current.revisionNumber || "1 RT-2026").toUpperCase();
+      els.revisionText.value = (appState.current.revisionText || "TRIMESTRAL").toUpperCase();
 
       els.systemButtons.innerHTML = SYSTEMS.map(system => `
         <button class="btn lime" type="button" data-system="${escapeHtml(system)}">${escapeHtml(system)}</button>
       `).join("");
 
-      els.savedReports.innerHTML = appState.savedReports.length
-        ? appState.savedReports.map(report => `
+      els.preparedEntries.innerHTML = appState.current.entries.length
+        ? appState.current.entries.map((entry, index) => `
+          <div class="prepared-item">
+            <div>
+              <strong>${index + 1}. ${escapeHtml(entry.type)}</strong>
+              <span>${escapeHtml(entry.meta?.building || "Sin edificio")} | ${escapeHtml(entry.meta?.denomination || entry.type)}</span>
+            </div>
+            <div class="button-row">
+              <button class="btn blue" type="button" data-edit-entry="${entry.id}">Editar</button>
+              <button class="btn red" type="button" data-remove-entry="${entry.id}">Quitar</button>
+            </div>
+          </div>
+        `).join("")
+        : '<div class="empty">Pulsa un sistema amarillo para añadirlo al informe actual.</div>';
+
+      const reports = [...appState.savedReports].sort((a, b) => Number(a.number) - Number(b.number));
+      els.savedReports.innerHTML = reports.length
+        ? reports.map(report => `
           <div class="saved-item">
             <div class="saved-title">Informe ${report.number}</div>
             <div class="saved-meta">${escapeHtml((report.header || "").toUpperCase())}<br>${report.systems.length} sistema(s) grabado(s)</div>
@@ -585,11 +767,16 @@
         : '<div class="empty">Todavía no hay informes grabados.</div>';
     }
 
-    function renderSystem(system) {
-      activeSystem = system;
-      const data = ensureSystem(system);
-      els.systemTitle.textContent = system;
+    function renderEntry(entryId) {
+      activeEntryId = entryId;
+      const data = ensureEntry(entryId);
+      activeSystem = data.type;
+      els.systemTitle.textContent = data.type;
       els.systemSubtitle.textContent = `Informe ${appState.current.number}`;
+      els.metaClient.value = data.meta.client || appState.current.header || "";
+      els.metaBuilding.value = data.meta.building || "";
+      els.metaSystem.value = data.meta.system || data.type;
+      els.metaDenomination.value = data.meta.denomination || data.type;
       els.sectionContainer.innerHTML = SECTIONS.map(section => {
         const value = data.sections[section];
         return `
@@ -626,12 +813,17 @@
     }
 
     function saveSystemInputs() {
-      if (!activeSystem) return;
-      const data = ensureSystem(activeSystem);
+      if (!activeEntryId) return;
+      const data = ensureEntry(activeEntryId);
+      data.meta.client = els.metaClient.value;
+      data.meta.building = els.metaBuilding.value;
+      data.meta.system = els.metaSystem.value;
+      data.meta.denomination = els.metaDenomination.value;
       document.querySelectorAll("[data-fixed]").forEach(textarea => {
         const section = textarea.dataset.fixed;
         data.sections[section].fixed = textarea.value;
-        appState.fixedTexts[activeSystem][section] = textarea.value;
+        if (!appState.fixedTexts[data.type]) appState.fixedTexts[data.type] = {};
+        appState.fixedTexts[data.type][section] = textarea.value;
       });
       document.querySelectorAll("[data-voice]").forEach(textarea => {
         const section = textarea.dataset.voice;
@@ -680,10 +872,9 @@
       });
     }
 
-    function buildSystemReport(system) {
+    function buildSystemReport(entryId) {
       saveSystemInputs();
-      const data = ensureSystem(system);
-      const header = (appState.current.header || "INFORME").toUpperCase();
+      const data = ensureEntry(entryId);
       const sectionHtml = SECTIONS.map(section => {
         const fixed = data.sections[section].fixed.trim();
         const voice = data.sections[section].voice.trim();
@@ -698,16 +889,14 @@
 
       const html = `
         <section class="doc-part">
-          <div class="doc-main-title">${escapeHtml(header)}</div>
-          <div class="doc-system-title">${escapeHtml(system)}</div>
+          <div class="doc-system-title">${escapeHtml(data.type)}</div>
           ${sectionHtml}
           ${photoHtml}
         </section>
       `;
 
       const text = [
-        header,
-        system,
+        data.type,
         ...SECTIONS.flatMap(section => [
           section,
           composeParagraph(section, data.sections[section].fixed.trim(), data.sections[section].voice.trim())
@@ -719,6 +908,36 @@
       data.mountedText = text;
       saveState();
       return { html, text };
+    }
+
+    function buildReportCover(report) {
+      const header = (report.header || "INFORME").toUpperCase();
+      const revisionNumber = (report.revisionNumber || "1 RT-2026").toUpperCase();
+      const revisionText = (report.revisionText || "TRIMESTRAL").toUpperCase();
+      const rows = report.systems.map(system => `
+        <tr>
+          <td>${escapeHtml(system.meta?.building || "")}</td>
+          <td>${escapeHtml(system.meta?.system || system.name)}</td>
+          <td>${escapeHtml(system.meta?.denomination || system.name)}</td>
+        </tr>
+      `).join("");
+
+      return `
+        <div class="doc-main-title">${escapeHtml(header)}</div>
+        <div class="doc-revision-row">
+          <div><strong>Nº REVISIÓN:</strong> ${escapeHtml(revisionNumber)}</div>
+          <div><strong>REVISIÓN:</strong> ${escapeHtml(revisionText)}</div>
+        </div>
+        <table class="summary-table">
+          <tr><th class="summary-client" colspan="3">CLIENTE: <span>${escapeHtml(report.systems[0]?.meta?.client || header)}</span></th></tr>
+          <tr>
+            <th class="summary-head">EDIFICIO</th>
+            <th class="summary-head">SISTEMA</th>
+            <th class="summary-head">DENOMINACIÓN</th>
+          </tr>
+          ${rows || '<tr><td></td><td></td><td></td></tr>'}
+        </table>
+      `;
     }
 
     function composeParagraph(section, fixed, voice) {
@@ -750,29 +969,34 @@
       }
 
       const existingIndex = appState.savedReports.findIndex(report =>
-        (appState.current.editingId && report.id === appState.current.editingId) ||
-        (!appState.current.editingId && report.number === appState.current.number)
+        appState.current.editingId && report.id === appState.current.editingId
       );
       const report = {
         id: existingIndex >= 0 ? appState.savedReports[existingIndex].id : makeId(),
         number: appState.current.number,
         header: appState.current.header,
+        revisionNumber: appState.current.revisionNumber,
+        revisionText: appState.current.revisionText,
         systems,
         sourceSystems: cloneData(appState.current.systems),
+        sourceEntries: cloneData(appState.current.entries),
         createdAt: new Date().toISOString()
       };
 
       if (existingIndex >= 0) appState.savedReports[existingIndex] = report;
       else appState.savedReports.push(report);
 
-      appState.nextNumber = Math.max(appState.nextNumber || 1, appState.current.number + 1);
+      normalizeSavedReports();
+      appState.nextNumber = getNextReportNumber();
       appState.current = {
         number: appState.nextNumber,
         header: "",
+        revisionNumber: "1 RT-2026",
+        revisionText: "TRIMESTRAL",
         systems: {},
+        entries: [],
         editingId: null
       };
-      appState.nextNumber += 1;
       saveState();
       renderHome();
       setStatus(els.homeStatus, `Informe ${report.number} grabado.`);
@@ -780,17 +1004,17 @@
     }
 
     function collectCurrentSystems() {
-      return SYSTEMS
-        .filter(system => appState.current.systems[system])
-        .map(system => ({ name: system, data: ensureSystem(system) }))
+      return appState.current.entries
+        .map(entry => ({ name: entry.type, data: ensureEntry(entry.id) }))
         .filter(item => item.data.mountedHtml || hasSystemContent(item.data))
         .map(item => {
-          if (!item.data.mountedHtml) buildSystemReport(item.name);
+          if (!item.data.mountedHtml) buildSystemReport(item.data.id);
           return {
             name: item.name,
-            html: appState.current.systems[item.name].mountedHtml,
-            text: appState.current.systems[item.name].mountedText,
-            photos: appState.current.systems[item.name].photos.filter(Boolean)
+            meta: cloneData(item.data.meta),
+            html: item.data.mountedHtml,
+            text: item.data.mountedText,
+            photos: item.data.photos.filter(Boolean)
           };
         });
     }
@@ -801,6 +1025,8 @@
         id: "current",
         number: appState.current.number,
         header: appState.current.header,
+        revisionNumber: appState.current.revisionNumber,
+        revisionText: appState.current.revisionText,
         systems: collectCurrentSystems(),
         createdAt: new Date().toISOString()
       };
@@ -831,6 +1057,25 @@
       return `report-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
+    function normalizeSavedReports() {
+      const byId = new Map();
+      appState.savedReports.forEach(report => {
+        if (!report.id) report.id = makeId();
+        report.number = Number(report.number || 0);
+        report.systems = Array.isArray(report.systems) ? report.systems : [];
+        byId.set(report.id, report);
+      });
+      appState.savedReports = [...byId.values()]
+        .filter(report => report.number > 0)
+        .sort((a, b) => a.number - b.number);
+    }
+
+    function getNextReportNumber() {
+      normalizeSavedReports();
+      const maxSaved = appState.savedReports.reduce((max, report) => Math.max(max, Number(report.number || 0)), 0);
+      return maxSaved + 1;
+    }
+
     function cloneData(value) {
       return JSON.parse(JSON.stringify(value || {}));
     }
@@ -855,25 +1100,75 @@
       return systems;
     }
 
+    function entriesFromSavedReport(report) {
+      if (report.sourceEntries) return cloneData(report.sourceEntries);
+      if (report.sourceSystems) return entriesFromSystems(report.sourceSystems);
+
+      return (report.systems || []).map(item => ({
+        id: makeId(),
+        type: item.name,
+        meta: item.meta || {
+          client: report.header || "",
+          building: "",
+          system: item.name,
+          denomination: item.name
+        },
+        sections: { [SECTIONS[0]]: { fixed: "", voice: item.text || "" } },
+        photos: item.photos || [],
+        mountedHtml: item.html || "",
+        mountedText: item.text || ""
+      }));
+    }
+
     function openSavedReport(report) {
+      const entries = entriesFromSavedReport(report);
+      const firstEntryId = entries[0]?.id || "";
       appState.current = {
         number: report.number,
         header: report.header || "",
+        revisionNumber: report.revisionNumber || "1 RT-2026",
+        revisionText: report.revisionText || "TRIMESTRAL",
         systems: systemsFromSavedReport(report),
+        entries,
         editingId: report.id
       };
-      appState.nextNumber = Math.max(Number(appState.nextNumber || 1), Number(report.number || 0) + 1);
+      appState.nextNumber = getNextReportNumber();
       saveState();
       renderHome();
       setStatus(els.homeStatus, `Informe ${report.number} abierto para rectificar.`);
-      showScreen("homeScreen");
+      if (firstEntryId) renderEntry(firstEntryId);
+      else showScreen("homeScreen");
     }
 
     function clearCurrentReport() {
+      if (appState.current.editingId) {
+        const deleted = appState.savedReports.find(report => report.id === appState.current.editingId);
+        appState.savedReports = appState.savedReports.filter(report => report.id !== appState.current.editingId);
+        appState.nextNumber = getNextReportNumber();
+        appState.current = {
+            number: appState.nextNumber,
+            header: "",
+            revisionNumber: "1 RT-2026",
+            revisionText: "TRIMESTRAL",
+            systems: {},
+            entries: [],
+            editingId: null
+        };
+        saveState();
+        renderHome();
+        setStatus(els.homeStatus, deleted ? `Informe ${deleted.number} borrado.` : "Informe actual borrado.");
+        showScreen("homeScreen");
+        return;
+      }
+
+      appState.nextNumber = Math.max(getNextReportNumber(), Number(appState.current.number || 0) + 1);
       appState.current = {
-        number: appState.current.number || appState.nextNumber || 1,
+        number: appState.nextNumber,
         header: "",
+        revisionNumber: "1 RT-2026",
+        revisionText: "TRIMESTRAL",
         systems: {},
+        entries: [],
         editingId: null
       };
       saveState();
@@ -883,11 +1178,18 @@
     }
 
     function buildFullHtml(report) {
-      return `<div class="doc">${report.systems.map(system => system.html).join('<div style="page-break-after: always;"></div>')}</div>`;
+      return `<div class="doc">${buildReportCover(report)}${report.systems.map(system => system.html).join('<div style="page-break-after: always;"></div>')}</div>`;
     }
 
     function buildFullText(report) {
-      return report.systems.map(system => system.text).join("\n\n------------------------------\n\n");
+      const header = [
+        (report.header || "INFORME").toUpperCase(),
+        `Nº REVISIÓN: ${(report.revisionNumber || "1 RT-2026").toUpperCase()}`,
+        `REVISIÓN: ${(report.revisionText || "TRIMESTRAL").toUpperCase()}`,
+        "CUADRO RESUMEN",
+        ...report.systems.map(system => `${system.meta?.building || ""} | ${system.meta?.system || system.name} | ${system.meta?.denomination || system.name}`)
+      ].join("\n");
+      return `${header}\n\n${report.systems.map(system => system.text).join("\n\n------------------------------\n\n")}`;
     }
 
     function downloadWord(html, filename) {
@@ -899,6 +1201,12 @@
           <style>
             body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; }
             .doc-main-title { text-align: center; text-transform: uppercase; font-size: 14pt; font-weight: 700; margin-bottom: 18px; }
+            .doc-revision-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+            .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+            .summary-table th, .summary-table td { border: 1px solid #222; padding: 4px 6px; }
+            .summary-client { background: #d4c4f0; text-align: left; font-weight: 700; }
+            .summary-head { background: #ae93e4; text-align: center; font-weight: 700; }
+            .summary-table td { background: #e5dcf5; }
             .doc-system-title { text-align: center; font-size: 13pt; font-weight: 700; margin-bottom: 16px; }
             h3 { font-size: 11.5pt; margin: 14px 0 6px; }
             p { margin: 0 0 8px; }
@@ -956,22 +1264,25 @@
       renderHome();
       showScreen("homeScreen");
     });
-    document.getElementById("backFromPreviewBtn").addEventListener("click", () => renderSystem(activeSystem));
+    document.getElementById("backFromPreviewBtn").addEventListener("click", () => renderEntry(activeEntryId));
     document.getElementById("mountBtn").addEventListener("click", () => {
-      const report = buildSystemReport(activeSystem);
-      els.mountedPreview.innerHTML = report.html;
-      els.previewSubtitle.textContent = activeSystem;
+      buildSystemReport(activeEntryId);
+      const report = makeCurrentReportSnapshot();
+      els.mountedPreview.innerHTML = buildFullHtml(report);
+      els.previewSubtitle.textContent = `Informe ${appState.current.number}`;
       setStatus(els.previewStatus, "");
       showScreen("previewScreen");
     });
     document.getElementById("saveMountedBtn").addEventListener("click", saveCurrentReport);
     document.getElementById("downloadMountedWordBtn").addEventListener("click", () => {
-      const report = buildSystemReport(activeSystem);
-      downloadWord(report.html, `informe-${appState.current.number}-${activeSystem}.doc`);
+      buildSystemReport(activeEntryId);
+      const report = makeCurrentReportSnapshot();
+      downloadWord(buildFullHtml(report), `informe-${appState.current.number}.doc`);
     });
     document.getElementById("downloadMountedPdfBtn").addEventListener("click", () => {
-      const report = buildSystemReport(activeSystem);
-      downloadPdfFromText(report.text, `informe-${appState.current.number}-${activeSystem}.pdf`);
+      buildSystemReport(activeEntryId);
+      const report = makeCurrentReportSnapshot();
+      downloadPdfFromText(buildFullText(report), `informe-${appState.current.number}.pdf`);
     });
     document.getElementById("clearMountedBtn").addEventListener("click", clearCurrentReport);
     document.getElementById("downloadAllPdfBtn").addEventListener("click", () => {
@@ -992,13 +1303,53 @@
     });
 
     els.reportHeader.addEventListener("input", () => {
-      appState.current.header = els.reportHeader.value;
+      appState.current.header = els.reportHeader.value.toUpperCase();
+      els.reportHeader.value = appState.current.header;
+      appState.current.entries.forEach(entry => {
+        if (!entry.meta.client) entry.meta.client = appState.current.header;
+      });
+      saveState();
+    });
+
+    els.revisionNumber.addEventListener("input", () => {
+      appState.current.revisionNumber = els.revisionNumber.value.toUpperCase();
+      els.revisionNumber.value = appState.current.revisionNumber;
+      saveState();
+    });
+
+    els.revisionText.addEventListener("input", () => {
+      appState.current.revisionText = els.revisionText.value.toUpperCase();
+      els.revisionText.value = appState.current.revisionText;
       saveState();
     });
 
     els.systemButtons.addEventListener("click", event => {
       const button = event.target.closest("[data-system]");
-      if (button) renderSystem(button.dataset.system);
+      if (button) {
+        const entry = makeEntry(button.dataset.system);
+        appState.current.entries.push(entry);
+        activeEntryId = entry.id;
+        renderEntry(entry.id);
+      }
+    });
+
+    els.preparedEntries.addEventListener("click", event => {
+      const editButton = event.target.closest("[data-edit-entry]");
+      if (editButton) {
+        renderEntry(editButton.dataset.editEntry);
+        return;
+      }
+
+      const removeButton = event.target.closest("[data-remove-entry]");
+      if (removeButton) {
+        appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
+        saveState();
+        renderHome();
+      }
+    });
+
+    [els.metaClient, els.metaBuilding, els.metaSystem, els.metaDenomination].forEach(input => {
+      input.addEventListener("input", saveSystemInputs);
     });
 
     els.savedReports.addEventListener("click", event => {
@@ -1041,12 +1392,12 @@
     els.photoContainer.addEventListener("change", async event => {
       const input = event.target.closest("[data-photo]");
       if (!input || !input.files[0]) return;
-      const data = ensureSystem(activeSystem);
+      const data = ensureEntry(activeEntryId);
       const index = Number(input.dataset.photo);
       try {
         data.photos[index] = await fileToDataUrl(input.files[0]);
         saveState();
-        renderSystem(activeSystem);
+        renderEntry(activeEntryId);
       } catch (error) {
         setStatus(els.systemStatus, "No se pudo cargar la imagen.", true);
       }
@@ -1055,10 +1406,10 @@
     els.photoContainer.addEventListener("click", event => {
       const button = event.target.closest("[data-delete-photo]");
       if (!button) return;
-      const data = ensureSystem(activeSystem);
+      const data = ensureEntry(activeEntryId);
       data.photos[Number(button.dataset.deletePhoto)] = null;
       saveState();
-      renderSystem(activeSystem);
+      renderEntry(activeEntryId);
     });
 
     renderHome();

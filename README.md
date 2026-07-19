@@ -7,6 +7,9 @@ App estatica para crear informes tecnicos de sistemas PCI desde GitHub Pages.
 - Informes numerados y guardados en el navegador.
 - Informes guardados con opcion de abrir, rectificar y volver a grabar.
 - Cabecera del informe en mayusculas.
+- Campos editables de Nº revision y Revision, con valores por defecto `1 RT-2026` y `TRIMESTRAL`.
+- Varios sistemas dentro del mismo informe, incluso varios del mismo tipo.
+- Cuadro resumen con cliente, edificio, sistema y denominacion de todos los sistemas preparados.
 - Sistemas:
   - Central de Deteccion de Incendios
   - Central de Extincion de Incendios

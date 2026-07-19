@@ -575,6 +575,29 @@
     const DB_NAME = "sistemas-informes-db";
     const DB_STORE = "state";
 
+    const DEFAULT_FIXED_TEXTS = {
+      [SYSTEMS[0]]: {
+        [SECTIONS[0]]: `Durante la visita de mantenimiento/inspección se comprueba la central principal de detección de incendios instalada en la dependencia indicada. El informe recoge exclusivamente el estado observado en el momento de la revisión, identificando la información visible en pantalla, pilotos, alimentación, baterías, zonas/lazos y elementos asociados cuando sea posible. Cuando no exista listado de zonas o documentación disponible, se dejará constancia expresa de que no se puede determinar la correspondencia exacta entre zona/lazo y ubicación protegida.`,
+        [SECTIONS[1]]: `Se realiza comprobación visual y funcional de la central, revisando el estado general del equipo, señalización luminosa, indicaciones de pantalla, estado de avería/alarma/desconexión/prueba, alimentación, baterías y, cuando procede, comunicación con zonas, lazos, sirenas, pulsadores, detectores o módulos. Se verifican las incidencias que aparecen registradas por la propia central sin modificar la configuración ni alterar la instalación fuera del alcance de mantenimiento indicado.`,
+        [SECTIONS[2]]: `La central queda descrita conforme al estado observado.`,
+        [SECTIONS[3]]: `A efectos de encuadre técnico, el sistema se analiza dentro del Reglamento de Instalaciones de Protección Contra Incendios, Real Decreto 513/2017, y de la familia UNE 23007 aplicable a sistemas de detección y alarma de incendios, especialmente en lo relativo a planificación, instalación, puesta en servicio, uso y mantenimiento. En edificios no industriales puede resultar aplicable el CTE DB-SI; en establecimientos industriales, el RSCIEI vigente.
+
+Real Decreto 513/2017, RIPCI: Reglamento principal aplicable a las instalaciones de protección contra incendios, incluyendo los sistemas de detección y alarma de incendios.
+Anexo II del RIPCI: Define las operaciones mínimas de mantenimiento de los sistemas de detección y alarma de incendios.
+Sistemas de detección y alarma de incendios: Incluidos dentro del RIPCI como sistemas de protección activa contra incendios.
+UNE 23007: Familia normativa de referencia para sistemas de detección y alarma de incendios.
+UNE 23007-14: Norma de referencia para planificación, diseño, instalación, puesta en servicio, uso y mantenimiento de sistemas de detección y alarma de incendios.
+Central de detección: Equipo de control e indicación del sistema, encargado de recibir señales de detectores, pulsadores y módulos, así como de gestionar alarmas, averías y anulaciones.
+Detectores, pulsadores y módulos: Elementos de campo asociados al sistema de detección, supervisados desde la central según la configuración de la instalación.
+Real Decreto 314/2006, CTE: Aplicable cuando el sistema pertenece a edificios sujetos al Código Técnico de la Edificación.
+CTE DB-SI: Documento Básico de Seguridad en caso de Incendio. Define exigencias de protección contra incendios en edificios.
+Real Decreto 164/2025, RSCIEI: Aplicable cuando el sistema de detección protege un establecimiento industrial.`,
+        [SECTIONS[4]]: `La central de detección ha sido comprobada durante la intervención, verificándose su estado de servicio y las indicaciones presentes en el equipo en el momento de la revisión. Durante la comprobación se ha observado el estado general de la central, pilotos de señalización, pantalla, avisos de avería, alarmas, anulaciones, alimentación, baterías y demás elementos accesibles vinculados al sistema de detección y alarma de incendios.
+
+Las incidencias reflejadas corresponden a las señales y estados indicados por la central en la fecha de revisión, así como a las observaciones realizadas sobre los elementos visibles y comprobables del sistema. El presente informe recoge el estado técnico apreciado durante el mantenimiento, dejando constancia de las condiciones de funcionamiento observadas, sin incluir valoraciones sobre actuaciones posteriores no realizadas en el momento de la inspección.`
+      }
+    };
+
     const emptySection = () => ({ fixed: "", voice: "" });
 
     const defaultState = () => ({
@@ -587,7 +610,7 @@
         systems: {},
         entries: []
       },
-      fixedTexts: {},
+      fixedTexts: cloneData(DEFAULT_FIXED_TEXTS),
       savedReports: []
     });
 
@@ -659,9 +682,20 @@
       state.current.systems = state.current.systems || {};
       state.current.entries = Array.isArray(state.current.entries) ? state.current.entries : entriesFromSystems(state.current.systems);
       state.current.editingId = state.current.editingId || null;
-      state.fixedTexts = state.fixedTexts || {};
+      state.fixedTexts = mergeDefaultFixedTexts(state.fixedTexts || {});
       state.savedReports = Array.isArray(state.savedReports) ? state.savedReports : [];
       return state;
+    }
+
+    function mergeDefaultFixedTexts(fixedTexts) {
+      const merged = cloneData(DEFAULT_FIXED_TEXTS);
+      Object.entries(fixedTexts || {}).forEach(([system, sections]) => {
+        if (!merged[system]) merged[system] = {};
+        Object.entries(sections || {}).forEach(([section, text]) => {
+          if (text) merged[system][section] = text;
+        });
+      });
+      return merged;
     }
 
     function saveState() {

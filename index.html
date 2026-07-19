@@ -399,6 +399,14 @@
       border: 1px solid #ddd;
     }
 
+    .doc .blank-page {
+      min-height: 1122px;
+      page-break-before: always;
+      page-break-after: always;
+      break-before: page;
+      break-after: page;
+    }
+
     .empty {
       color: var(--muted);
       border: 1px dashed var(--line);
@@ -1489,7 +1497,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
 
     function buildFullHtml(report) {
       const systems = systemsForOutput(report);
-      return `<div class="doc">${buildReportCover({ ...report, systems })}${systems.map(system => system.html).join('<div style="page-break-after: always;"></div>')}</div>`;
+      const blankPage = '<div class="blank-page" aria-hidden="true"></div>';
+      return `<div class="doc">${buildReportCover({ ...report, systems })}${systems.map(system => system.html).join(blankPage)}</div>`;
     }
 
     function buildFullText(report) {

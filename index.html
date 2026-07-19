@@ -784,8 +784,13 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
 
     function saveState() {
       saveStateToDb(appState);
+      return saveStateToLocalStorage();
+    }
+
+    function saveStateToLocalStorage() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(makeLocalStorageState(appState)));
         return true;
       } catch (error) {
         const target = els.systemScreen.classList.contains("active")
@@ -798,14 +803,36 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       }
     }
 
+    function makeLocalStorageState(state) {
+      const copy = cloneData(state);
+      stripHeavyReportData(copy);
+      return copy;
+    }
+
+    function stripHeavyReportData(state) {
+      (state.current?.entries || []).forEach(entry => stripHeavyEntryData(entry));
+      (state.savedReports || []).forEach(report => {
+        (report.sourceEntries || []).forEach(entry => stripHeavyEntryData(entry));
+        (report.systems || []).forEach(system => {
+          system.photos = [];
+          system.html = "";
+        });
+      });
+    }
+
+    function stripHeavyEntryData(entry) {
+      entry.photos = (entry.photos || []).map(() => null);
+      entry.mountedHtml = "";
+    }
+
     async function saveStateToDb(state) {
       const db = await dbPromise;
-      if (!db) return;
-      await new Promise(resolve => {
+      if (!db) return false;
+      return await new Promise(resolve => {
         const tx = db.transaction(DB_STORE, "readwrite");
         tx.objectStore(DB_STORE).put(cloneData(state), STORAGE_KEY);
-        tx.oncomplete = resolve;
-        tx.onerror = resolve;
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
       });
     }
 
@@ -1209,7 +1236,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       return `Como conclusión técnica, se recoge la actuación o seguimiento necesario para dejar el sistema en condiciones adecuadas de servicio y mantenimiento. ${content}`;
     }
 
-    function saveCurrentReport() {
+    async function saveCurrentReport() {
       saveSystemInputs();
       const systems = collectCurrentSystems();
 
@@ -1232,6 +1259,9 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         sourceEntries: cloneData(appState.current.entries),
         createdAt: new Date().toISOString()
       };
+      const previousCurrent = cloneData(appState.current);
+      const previousReports = cloneData(appState.savedReports);
+      const previousNextNumber = appState.nextNumber;
 
       if (existingIndex >= 0) appState.savedReports[existingIndex] = report;
       else appState.savedReports.push(report);
@@ -1247,10 +1277,26 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         entries: [],
         editingId: null
       };
-      saveState();
+      const dbOk = await saveStateToDb(appState);
+      const localOk = saveStateToLocalStorage();
+      const needsPhotoStorage = reportHasPhotos(report);
+      if ((needsPhotoStorage && !dbOk) || (!needsPhotoStorage && !dbOk && !localOk)) {
+        appState.current = previousCurrent;
+        appState.savedReports = previousReports;
+        appState.nextNumber = previousNextNumber;
+        renderHome();
+        setStatus(els.homeStatus, "No se pudo grabar el informe con las fotos. Reduce el tamaño o número de fotos.", true);
+        showScreen("homeScreen");
+        return;
+      }
       renderHome();
       setStatus(els.homeStatus, `Informe ${report.number} grabado.`);
       showScreen("homeScreen");
+    }
+
+    function reportHasPhotos(report) {
+      return (report.sourceEntries || []).some(entry => (entry.photos || []).some(Boolean))
+        || (report.systems || []).some(system => (system.photos || []).some(Boolean));
     }
 
     function collectCurrentSystems() {

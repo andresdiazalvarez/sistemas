@@ -975,14 +975,24 @@
     function buildSystemReport(entryId) {
       saveSystemInputs();
       const data = ensureEntry(entryId);
+      const report = composeEntryReport(data);
+
+      data.mountedHtml = report.html;
+      data.mountedText = report.text;
+      saveState();
+      return report;
+    }
+
+    function composeEntryReport(data) {
       const sectionHtml = SECTIONS.map(section => {
-        const fixed = data.sections[section].fixed.trim();
-        const voice = data.sections[section].voice.trim();
+        const item = data.sections?.[section] || emptySection();
+        const fixed = item.fixed.trim();
+        const voice = item.voice.trim();
         const paragraph = composeParagraph(section, fixed, voice);
         return `<h3>${escapeHtml(section)}</h3><p>${escapeHtml(paragraph)}</p>`;
       }).join("");
 
-      const photos = data.photos.filter(Boolean);
+      const photos = (data.photos || []).filter(Boolean);
       const photoHtml = photos.length
         ? `<div class="photo-title">ANEXO FOTOGRÁFICO</div><div class="photo-grid">${photos.map(src => `<img src="${src}" alt="">`).join("")}</div>`
         : `<div class="photo-title">ANEXO FOTOGRÁFICO</div>`;
@@ -997,16 +1007,16 @@
 
       const text = [
         data.type,
-        ...SECTIONS.flatMap(section => [
-          section,
-          composeParagraph(section, data.sections[section].fixed.trim(), data.sections[section].voice.trim())
-        ]),
+        ...SECTIONS.flatMap(section => {
+          const item = data.sections?.[section] || emptySection();
+          return [
+            section,
+            composeParagraph(section, item.fixed.trim(), item.voice.trim())
+          ];
+        }),
         "ANEXO FOTOGRÁFICO"
       ].join("\n\n");
 
-      data.mountedHtml = html;
-      data.mountedText = text;
-      saveState();
       return { html, text };
     }
 
@@ -1108,7 +1118,7 @@
         .map(entry => ({ name: entry.type, data: ensureEntry(entry.id) }))
         .filter(item => item.data.mountedHtml || hasSystemContent(item.data))
         .map(item => {
-          if (!item.data.mountedHtml) buildSystemReport(item.data.id);
+          buildSystemReport(item.data.id);
           return {
             name: item.name,
             meta: cloneData(item.data.meta),
@@ -1278,18 +1288,36 @@
     }
 
     function buildFullHtml(report) {
-      return `<div class="doc">${buildReportCover(report)}${report.systems.map(system => system.html).join('<div style="page-break-after: always;"></div>')}</div>`;
+      const systems = systemsForOutput(report);
+      return `<div class="doc">${buildReportCover({ ...report, systems })}${systems.map(system => system.html).join('<div style="page-break-after: always;"></div>')}</div>`;
     }
 
     function buildFullText(report) {
+      const systems = systemsForOutput(report);
       const header = [
         (report.header || "INFORME").toUpperCase(),
         `Nº REVISIÓN: ${(report.revisionNumber || "1 RT-2026").toUpperCase()}`,
         `REVISIÓN: ${(report.revisionText || "TRIMESTRAL").toUpperCase()}`,
         "CUADRO RESUMEN",
-        ...report.systems.map(system => `${system.meta?.building || ""} | ${system.meta?.system || system.name} | ${system.meta?.denomination || system.name}`)
+        ...systems.map(system => `${system.meta?.building || ""} | ${system.meta?.system || system.name} | ${system.meta?.denomination || system.name}`)
       ].join("\n");
-      return `${header}\n\n${report.systems.map(system => system.text).join("\n\n------------------------------\n\n")}`;
+      return `${header}\n\n${systems.map(system => system.text).join("\n\n------------------------------\n\n")}`;
+    }
+
+    function systemsForOutput(report) {
+      if (Array.isArray(report.sourceEntries) && report.sourceEntries.length) {
+        return report.sourceEntries.map(entry => {
+          const built = composeEntryReport(entry);
+          return {
+            name: entry.type,
+            meta: cloneData(entry.meta),
+            html: built.html,
+            text: built.text,
+            photos: (entry.photos || []).filter(Boolean)
+          };
+        });
+      }
+      return Array.isArray(report.systems) ? report.systems : [];
     }
 
     function downloadWord(html, filename) {
@@ -1600,6 +1628,8 @@
       try {
         const previous = data.photos[index];
         data.photos[index] = await compressImageFile(input.files[0]);
+        data.mountedHtml = "";
+        data.mountedText = "";
         if (!saveState()) {
           data.photos[index] = previous;
           return;
@@ -1615,6 +1645,8 @@
       if (!button) return;
       const data = ensureEntry(activeEntryId);
       data.photos[Number(button.dataset.deletePhoto)] = null;
+      data.mountedHtml = "";
+      data.mountedText = "";
       saveState();
       renderEntry(activeEntryId);
     });

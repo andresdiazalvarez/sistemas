@@ -59,6 +59,13 @@
       min-width: 0;
     }
 
+    .brand-title-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
     .brand-mark {
       width: 44px;
       height: 44px;
@@ -429,7 +436,10 @@
       <div class="brand">
         <div class="brand-mark">SI</div>
         <div>
-          <h1>SISTEMAS</h1>
+          <div class="brand-title-row">
+            <h1>SISTEMAS</h1>
+            <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
+          </div>
           <p class="subhead">Creación y archivo de informes técnicos por sistema.</p>
         </div>
       </div>
@@ -599,6 +609,7 @@
       preparedEntries: document.getElementById("preparedEntries"),
       savedReports: document.getElementById("savedReports"),
       homeStatus: document.getElementById("homeStatus"),
+      clearAppDataBtn: document.getElementById("clearAppDataBtn"),
       systemTitle: document.getElementById("systemTitle"),
       systemSubtitle: document.getElementById("systemSubtitle"),
       sectionContainer: document.getElementById("sectionContainer"),
@@ -688,6 +699,17 @@
         const request = tx.objectStore(DB_STORE).get(STORAGE_KEY);
         request.onsuccess = () => resolve(request.result || null);
         request.onerror = () => resolve(null);
+      });
+    }
+
+    async function clearStateFromDb() {
+      const db = await dbPromise;
+      if (!db) return;
+      await new Promise(resolve => {
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).delete(STORAGE_KEY);
+        tx.oncomplete = resolve;
+        tx.onerror = resolve;
       });
     }
 
@@ -1287,6 +1309,20 @@
       showScreen("homeScreen");
     }
 
+    async function clearAppData() {
+      const ok = window.confirm("Esto borrara todos los informes y fotos guardados en SISTEMAS en este navegador. Si ya los has descargado, pulsa Aceptar.");
+      if (!ok) return;
+      localStorage.removeItem(STORAGE_KEY);
+      await clearStateFromDb();
+      appState = defaultState();
+      activeSystem = "";
+      activeEntryId = "";
+      previewMode = "entry";
+      renderHome();
+      showScreen("homeScreen");
+      setStatus(els.homeStatus, "Datos de SISTEMAS limpiados.");
+    }
+
     function buildFullHtml(report) {
       const systems = systemsForOutput(report);
       return `<div class="doc">${buildReportCover({ ...report, systems })}${systems.map(system => system.html).join('<div style="page-break-after: always;"></div>')}</div>`;
@@ -1478,6 +1514,7 @@
     document.getElementById("saveCurrentBtn").addEventListener("click", saveCurrentReport);
     document.getElementById("viewAllBtn").addEventListener("click", viewCurrentSet);
     document.getElementById("deleteCurrentBtn").addEventListener("click", clearCurrentReport);
+    els.clearAppDataBtn.addEventListener("click", clearAppData);
     document.getElementById("backFromSystemBtn").addEventListener("click", () => {
       saveSystemInputs();
       renderHome();

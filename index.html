@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SISTEMAS</title>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     :root {
       --lime: #d7ff00;
@@ -170,12 +171,6 @@
       white-space: normal;
     }
 
-    .short-fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
     .prepared-list {
       display: grid;
       gap: 8px;
@@ -197,9 +192,10 @@
       display: block;
     }
 
-    .prepared-item span {
-      color: var(--muted);
-      overflow-wrap: anywhere;
+    .short-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
 
     .meta-grid {
@@ -566,6 +562,8 @@
     ];
 
     const STORAGE_KEY = "sistemas.informes.v2";
+    const DB_NAME = "sistemas-informes-db";
+    const DB_STORE = "state";
 
     const emptySection = () => ({ fixed: "", voice: "" });
 
@@ -615,33 +613,107 @@
       previewStatus: document.getElementById("previewStatus")
     };
 
+    const dbPromise = new Promise(resolve => {
+      if (!("indexedDB" in window)) {
+        resolve(null);
+        return;
+      }
+      const request = indexedDB.open(DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+      request.onblocked = () => resolve(null);
+    });
+
     function loadState() {
       try {
         const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
         const state = parsed && parsed.current ? parsed : defaultState();
-        state.nextNumber = Number(state.nextNumber || state.current?.number || 1);
-        state.current = state.current || { number: state.nextNumber, header: "", systems: {} };
-        state.current.number = Number(state.current.number || state.nextNumber || 1);
-        state.current.header = state.current.header || "";
-        state.current.revisionNumber = (state.current.revisionNumber || "1 RT-2026").toUpperCase();
-        state.current.revisionText = (state.current.revisionText || "TRIMESTRAL").toUpperCase();
-        state.current.systems = state.current.systems || {};
-        state.current.entries = Array.isArray(state.current.entries) ? state.current.entries : entriesFromSystems(state.current.systems);
-        state.current.editingId = state.current.editingId || null;
-        state.fixedTexts = state.fixedTexts || {};
-        state.savedReports = Array.isArray(state.savedReports) ? state.savedReports : [];
-        return state;
+        return normalizeLoadedState(state);
       } catch (error) {
         return defaultState();
       }
     }
 
+    function normalizeLoadedState(state) {
+      state.nextNumber = Number(state.nextNumber || state.current?.number || 1);
+      state.current = state.current || { number: state.nextNumber, header: "", systems: {} };
+      state.current.number = Number(state.current.number || state.nextNumber || 1);
+      state.current.header = state.current.header || "";
+      state.current.revisionNumber = (state.current.revisionNumber || "1 RT-2026").toUpperCase();
+      state.current.revisionText = (state.current.revisionText || "TRIMESTRAL").toUpperCase();
+      state.current.systems = state.current.systems || {};
+      state.current.entries = Array.isArray(state.current.entries) ? state.current.entries : entriesFromSystems(state.current.systems);
+      state.current.editingId = state.current.editingId || null;
+      state.fixedTexts = state.fixedTexts || {};
+      state.savedReports = Array.isArray(state.savedReports) ? state.savedReports : [];
+      return state;
+    }
+
     function saveState() {
+      saveStateToDb(appState);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+        return true;
       } catch (error) {
-        setStatus(els.homeStatus, "No se pudo guardar. Puede que el navegador tenga el almacenamiento lleno.", true);
+        const target = els.systemScreen.classList.contains("active")
+          ? els.systemStatus
+          : els.previewScreen.classList.contains("active")
+            ? els.previewStatus
+            : els.homeStatus;
+        setStatus(target, "No se pudo guardar. Reduce el tamaño o número de fotos.", true);
+        return false;
       }
+    }
+
+    async function saveStateToDb(state) {
+      const db = await dbPromise;
+      if (!db) return;
+      await new Promise(resolve => {
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).put(cloneData(state), STORAGE_KEY);
+        tx.oncomplete = resolve;
+        tx.onerror = resolve;
+      });
+    }
+
+    async function loadStateFromDb() {
+      const db = await dbPromise;
+      if (!db) return null;
+      return await new Promise(resolve => {
+        const tx = db.transaction(DB_STORE, "readonly");
+        const request = tx.objectStore(DB_STORE).get(STORAGE_KEY);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => resolve(null);
+      });
+    }
+
+    async function restoreStateFromDb() {
+      const stored = await loadStateFromDb();
+      if (!stored) return;
+      const localSavedCount = Array.isArray(appState.savedReports) ? appState.savedReports.length : 0;
+      const dbSavedCount = Array.isArray(stored.savedReports) ? stored.savedReports.length : 0;
+      const localPhotoCount = countPhotos(appState);
+      const dbPhotoCount = countPhotos(stored);
+      if (dbSavedCount > localSavedCount || dbPhotoCount > localPhotoCount) {
+        appState = stored;
+        normalizeLoadedState(appState);
+        renderHome();
+        setStatus(els.homeStatus, "Datos restaurados.");
+      }
+    }
+
+    function countPhotos(state) {
+      const currentPhotos = (state.current?.entries || []).reduce((count, entry) => count + (entry.photos || []).filter(Boolean).length, 0);
+      const savedPhotos = (state.savedReports || []).reduce((count, report) => {
+        const fromEntries = (report.sourceEntries || []).reduce((subtotal, entry) => subtotal + (entry.photos || []).filter(Boolean).length, 0);
+        const fromSystems = (report.systems || []).reduce((subtotal, system) => subtotal + (system.photos || []).filter(Boolean).length, 0);
+        return count + fromEntries + fromSystems;
+      }, 0);
+      return currentPhotos + savedPhotos;
     }
 
     function setStatus(el, message, isError = false) {
@@ -873,6 +945,30 @@
         reader.onload = () => resolve(reader.result);
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(file);
+      });
+    }
+
+    function compressImageFile(file, maxSide = 1280, quality = 0.72) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+          const width = Math.max(1, Math.round(img.width * scale));
+          const height = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("No se pudo leer la imagen."));
+        };
+        img.src = url;
       });
     }
 
@@ -1245,6 +1341,66 @@
       doc.save(filename);
     }
 
+    async function downloadPdfFromHtml(html, filename) {
+      const { jsPDF } = window.jspdf;
+      const host = document.createElement("div");
+      host.style.position = "fixed";
+      host.style.left = "-10000px";
+      host.style.top = "0";
+      host.style.width = "794px";
+      host.style.background = "#ffffff";
+      host.style.padding = "32px";
+      host.innerHTML = html;
+      document.body.appendChild(host);
+
+      try {
+        const canvas = await html2canvas(host, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true
+        });
+        const pdf = new jsPDF({ unit: "pt", format: "a4" });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 28;
+        const imgWidth = pageWidth - margin * 2;
+        const imgHeight = canvas.height * imgWidth / canvas.width;
+        const pageCanvas = document.createElement("canvas");
+        const pageCtx = pageCanvas.getContext("2d");
+        const sourcePageHeight = Math.floor((pageHeight - margin * 2) * canvas.width / imgWidth);
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sourcePageHeight;
+
+        let sourceY = 0;
+        let pageIndex = 0;
+        while (sourceY < canvas.height) {
+          pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+          pageCtx.fillStyle = "#ffffff";
+          pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          pageCtx.drawImage(
+            canvas,
+            0,
+            sourceY,
+            canvas.width,
+            Math.min(sourcePageHeight, canvas.height - sourceY),
+            0,
+            0,
+            canvas.width,
+            Math.min(sourcePageHeight, canvas.height - sourceY)
+          );
+          if (pageIndex > 0) pdf.addPage();
+          const pageData = pageCanvas.toDataURL("image/jpeg", 0.92);
+          const sliceHeight = Math.min(sourcePageHeight, canvas.height - sourceY) * imgWidth / canvas.width;
+          pdf.addImage(pageData, "JPEG", margin, margin, imgWidth, sliceHeight);
+          sourceY += sourcePageHeight;
+          pageIndex += 1;
+        }
+        pdf.save(filename);
+      } finally {
+        host.remove();
+      }
+    }
+
     function downloadBlob(bytes, type, filename) {
       const blob = new Blob([bytes], { type });
       const url = URL.createObjectURL(blob);
@@ -1322,23 +1478,23 @@
         downloadWord(buildFullHtml(report), `informe-${appState.current.number}.doc`);
       }
     });
-    document.getElementById("downloadMountedPdfBtn").addEventListener("click", () => {
+    document.getElementById("downloadMountedPdfBtn").addEventListener("click", async () => {
       if (previewMode === "entry") {
         const report = buildSystemReport(activeEntryId);
-        downloadPdfFromText(report.text, `informe-${appState.current.number}-${activeSystem}.pdf`);
+        await downloadPdfFromHtml(`<div class="doc">${report.html}</div>`, `informe-${appState.current.number}-${activeSystem}.pdf`);
       } else {
         const report = makeCurrentReportSnapshot();
-        downloadPdfFromText(buildFullText(report), `informe-${appState.current.number}.pdf`);
+        await downloadPdfFromHtml(buildFullHtml(report), `informe-${appState.current.number}.pdf`);
       }
     });
     document.getElementById("clearMountedBtn").addEventListener("click", clearCurrentReport);
-    document.getElementById("downloadAllPdfBtn").addEventListener("click", () => {
+    document.getElementById("downloadAllPdfBtn").addEventListener("click", async () => {
       const report = makeAllReportsSnapshot();
       if (!report.systems.length) {
         setStatus(els.homeStatus, "No hay informes para descargar.", true);
         return;
       }
-      downloadPdfFromText(buildFullText(report), "informes-sistemas.pdf");
+      await downloadPdfFromHtml(buildFullHtml(report), "informes-sistemas.pdf");
     });
     document.getElementById("downloadAllWordBtn").addEventListener("click", () => {
       const report = makeAllReportsSnapshot();
@@ -1426,7 +1582,7 @@
         downloadWord(buildFullHtml(report), `informe-${report.number}.doc`);
       }
       if (button.dataset.action === "pdf") {
-        downloadPdfFromText(buildFullText(report), `informe-${report.number}.pdf`);
+        downloadPdfFromHtml(buildFullHtml(report), `informe-${report.number}.pdf`);
       }
     });
 
@@ -1442,8 +1598,12 @@
       const data = ensureEntry(activeEntryId);
       const index = Number(input.dataset.photo);
       try {
-        data.photos[index] = await fileToDataUrl(input.files[0]);
-        saveState();
+        const previous = data.photos[index];
+        data.photos[index] = await compressImageFile(input.files[0]);
+        if (!saveState()) {
+          data.photos[index] = previous;
+          return;
+        }
         renderEntry(activeEntryId);
       } catch (error) {
         setStatus(els.systemStatus, "No se pudo cargar la imagen.", true);
@@ -1460,6 +1620,7 @@
     });
 
     renderHome();
+    restoreStateFromDb();
   </script>
 </body>
 </html>

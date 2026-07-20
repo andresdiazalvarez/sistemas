@@ -165,6 +165,11 @@
       resize: vertical;
     }
 
+    textarea.voice-state {
+      background: #fff4b8;
+      border-color: #f2d46b;
+    }
+
     .field { margin-bottom: 16px; }
 
     .systems {
@@ -1082,6 +1087,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
           </div>
         `;
       }).join("");
+      const stateVoiceField = els.sectionContainer.querySelector(`[data-voice="${CSS.escape(SECTIONS[2])}"]`);
+      if (stateVoiceField) stateVoiceField.classList.add("voice-state");
 
       els.photoContainer.innerHTML = data.photos.map((photo, index) => `
         <div class="photo-slot">

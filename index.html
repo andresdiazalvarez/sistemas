@@ -1426,7 +1426,6 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
 
     function openSavedReport(report) {
       const entries = entriesFromSavedReport(report);
-      const firstEntryId = entries[0]?.id || "";
       appState.current = {
         number: report.number,
         header: report.header || "",
@@ -1439,9 +1438,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       appState.nextNumber = getNextReportNumber();
       saveState();
       renderHome();
-      setStatus(els.homeStatus, `Informe ${report.number} abierto para rectificar.`);
-      if (firstEntryId) renderEntry(firstEntryId);
-      else showScreen("homeScreen");
+      setStatus(els.homeStatus, `Informe ${report.number} abierto para rectificar y añadir sistemas.`);
+      showScreen("homeScreen");
     }
 
     function clearCurrentReport() {

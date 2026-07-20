@@ -528,6 +528,29 @@
 
         <div id="sectionContainer"></div>
 
+        <div class="section-block">
+          <div class="section-head">
+            <div class="section-title">Modo seguro ChatGPT</div>
+            <div class="button-row">
+              <button id="prepareChatGptBtn" class="btn violet" type="button">Preparar texto para ChatGPT</button>
+              <button id="copyChatGptPromptBtn" class="btn blue" type="button">Copiar</button>
+            </div>
+          </div>
+          <div class="two-fields">
+            <div>
+              <label for="chatGptPrompt">Texto para copiar en ChatGPT</label>
+              <textarea id="chatGptPrompt" readonly placeholder="Pulsa Preparar texto para ChatGPT"></textarea>
+            </div>
+            <div>
+              <label for="chatGptResult">Respuesta mejorada de ChatGPT</label>
+              <textarea id="chatGptResult" placeholder="Pega aqui la respuesta redactada por ChatGPT"></textarea>
+            </div>
+          </div>
+          <div class="button-row" style="margin-top: 10px;">
+            <button id="applyChatGptResultBtn" class="btn pink" type="button">Aplicar texto al informe</button>
+          </div>
+        </div>
+
         <h2>Imágenes</h2>
         <div id="photoContainer" class="photos"></div>
 
@@ -733,6 +756,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       metaBuilding: document.getElementById("metaBuilding"),
       metaSystem: document.getElementById("metaSystem"),
       metaDenomination: document.getElementById("metaDenomination"),
+      chatGptPrompt: document.getElementById("chatGptPrompt"),
+      chatGptResult: document.getElementById("chatGptResult"),
       systemStatus: document.getElementById("systemStatus"),
       mountedPreview: document.getElementById("mountedPreview"),
       previewSubtitle: document.getElementById("previewSubtitle"),
@@ -923,6 +948,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         },
         sections: {},
         photos: [],
+        chatGptPrompt: "",
+        chatGptResult: "",
         mountedHtml: "",
         mountedText: ""
       };
@@ -940,6 +967,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         },
         sections: data.sections || {},
         photos: data.photos || [],
+        chatGptPrompt: data.chatGptPrompt || "",
+        chatGptResult: data.chatGptResult || "",
         mountedHtml: data.mountedHtml || "",
         mountedText: data.mountedText || ""
       }));
@@ -961,6 +990,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
           denomination: target.type
         };
       }
+      target.chatGptPrompt = target.chatGptPrompt || "";
+      target.chatGptResult = target.chatGptResult || "";
       SECTIONS.forEach(section => {
         if (!target.sections[section]) target.sections[section] = emptySection();
         if (!appState.fixedTexts[target.type]) appState.fixedTexts[target.type] = {};
@@ -1028,6 +1059,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       els.metaBuilding.value = data.meta.building || "";
       els.metaSystem.value = data.meta.system || data.type;
       els.metaDenomination.value = data.meta.denomination || data.type;
+      els.chatGptPrompt.value = data.chatGptPrompt || "";
+      els.chatGptResult.value = data.chatGptResult || "";
       els.sectionContainer.innerHTML = SECTIONS.map(section => {
         const value = data.sections[section];
         return `
@@ -1080,6 +1113,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         const section = textarea.dataset.voice;
         data.sections[section].voice = textarea.value;
       });
+      data.chatGptPrompt = els.chatGptPrompt.value;
+      data.chatGptResult = els.chatGptResult.value;
       saveState();
     }
 
@@ -1159,7 +1194,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
     }
 
     function composeEntryReport(data) {
-      const sectionHtml = SECTIONS.map(section => {
+      const chatGptText = (data.chatGptResult || "").trim();
+      const sectionHtml = chatGptText ? formatChatGptReportHtml(chatGptText) : SECTIONS.map(section => {
         const item = data.sections?.[section] || emptySection();
         const fixed = item.fixed.trim();
         const voice = item.voice.trim();
@@ -1182,17 +1218,32 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
 
       const text = [
         data.type,
-        ...SECTIONS.flatMap(section => {
+        ...(chatGptText ? [chatGptText] : SECTIONS.flatMap(section => {
           const item = data.sections?.[section] || emptySection();
           return [
             section,
             composeParagraph(section, item.fixed.trim(), item.voice.trim())
           ];
-        }),
+        })),
         "ANEXO FOTOGRÁFICO"
       ].join("\n\n");
 
       return { html, text };
+    }
+
+    function formatChatGptReportHtml(text) {
+      return text
+        .split(/\n{2,}/)
+        .map(block => block.trim())
+        .filter(Boolean)
+        .map(block => {
+          const safe = escapeHtml(block).replace(/\n/g, "<br>");
+          if (/^(\d+\.\s|[A-ZÁÉÍÓÚÑ0-9\s.,-]{8,})$/.test(block.trim())) {
+            return `<h3>${safe}</h3>`;
+          }
+          return `<p>${safe}</p>`;
+        })
+        .join("");
     }
 
     function buildReportCover(report) {
@@ -1242,6 +1293,78 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         return `La valoración se relaciona con la normativa de protección contra incendios aplicable, el RIPCI y las normas UNE que correspondan al sistema inspeccionado. ${content}`;
       }
       return `Como conclusión técnica, se recoge la actuación o seguimiento necesario para dejar el sistema en condiciones adecuadas de servicio y mantenimiento. ${content}`;
+    }
+
+    function buildChatGptPrompt(data) {
+      const sectionText = SECTIONS.map(section => {
+        const item = data.sections?.[section] || emptySection();
+        return [
+          section,
+          `Texto fijo: ${item.fixed.trim() || "Sin texto fijo."}`,
+          `Texto aportado/redactado: ${item.voice.trim() || "Sin texto aportado."}`
+        ].join("\n");
+      }).join("\n\n");
+
+      return `Quiero que redactes el texto definitivo de un informe tecnico de sistemas PCI.
+
+Sistema: ${data.type}
+Cliente: ${data.meta?.client || appState.current.header || ""}
+Edificio: ${data.meta?.building || ""}
+Sistema indicado: ${data.meta?.system || data.type}
+Denominacion: ${data.meta?.denomination || data.type}
+
+Criterio de redaccion:
+- Usa estilo tecnico, claro, directo y profesional.
+- No inventes datos que no aparezcan en la informacion aportada.
+- Desarrolla el texto de forma logica, como en informes anteriores de mantenimiento PCI.
+- Manten la estructura con estos apartados: 1. Antecedentes, 2. Comprobaciones realizadas, 3. Estado, 4. Normativa relacionada y 5. Conclusion.
+- Aprovecha el texto fijo como base y mejora el texto aportado por el usuario.
+- Si falta algun dato, no lo rellenes inventando; redacta de forma prudente.
+- No incluyas explicaciones sobre lo que has hecho. Devuelve solo el texto final del informe.
+
+Datos disponibles:
+
+${sectionText}`;
+    }
+
+    function prepareChatGptPrompt() {
+      saveSystemInputs();
+      const data = ensureEntry(activeEntryId);
+      data.chatGptPrompt = buildChatGptPrompt(data);
+      els.chatGptPrompt.value = data.chatGptPrompt;
+      data.mountedHtml = "";
+      data.mountedText = "";
+      saveState();
+      setStatus(els.systemStatus, "Texto preparado para copiar en ChatGPT.");
+    }
+
+    async function copyChatGptPrompt() {
+      const text = els.chatGptPrompt.value.trim();
+      if (!text) {
+        setStatus(els.systemStatus, "Primero prepara el texto para ChatGPT.", true);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus(els.systemStatus, "Texto copiado.");
+      } catch (error) {
+        els.chatGptPrompt.focus();
+        els.chatGptPrompt.select();
+        setStatus(els.systemStatus, "No se pudo copiar automaticamente. Selecciona y copia el texto.", true);
+      }
+    }
+
+    function applyChatGptResult() {
+      saveSystemInputs();
+      const data = ensureEntry(activeEntryId);
+      if (!data.chatGptResult.trim()) {
+        setStatus(els.systemStatus, "Pega primero la respuesta de ChatGPT.", true);
+        return;
+      }
+      data.mountedHtml = "";
+      data.mountedText = "";
+      saveState();
+      setStatus(els.systemStatus, "Texto de ChatGPT aplicado al informe.");
     }
 
     async function saveCurrentReport() {
@@ -1419,6 +1542,8 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         },
         sections: { [SECTIONS[0]]: { fixed: "", voice: item.text || "" } },
         photos: item.photos || [],
+        chatGptPrompt: "",
+        chatGptResult: "",
         mountedHtml: item.html || "",
         mountedText: item.text || ""
       }));
@@ -1686,6 +1811,9 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
     document.getElementById("viewAllBtn").addEventListener("click", viewCurrentSet);
     document.getElementById("deleteCurrentBtn").addEventListener("click", clearCurrentReport);
     els.clearAppDataBtn.addEventListener("click", clearAppData);
+    document.getElementById("prepareChatGptBtn").addEventListener("click", prepareChatGptPrompt);
+    document.getElementById("copyChatGptPromptBtn").addEventListener("click", copyChatGptPrompt);
+    document.getElementById("applyChatGptResultBtn").addEventListener("click", applyChatGptResult);
     document.getElementById("backFromSystemBtn").addEventListener("click", () => {
       saveSystemInputs();
       renderHome();
@@ -1790,6 +1918,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
     [els.metaClient, els.metaBuilding, els.metaSystem, els.metaDenomination].forEach(input => {
       input.addEventListener("input", saveSystemInputs);
     });
+    els.chatGptResult.addEventListener("input", saveSystemInputs);
 
     els.savedReports.addEventListener("click", event => {
       const button = event.target.closest("[data-action]");

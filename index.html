@@ -543,12 +543,12 @@
           </div>
           <div class="two-fields">
             <div>
-              <label for="chatGptPrompt">Texto para copiar en ChatGPT</label>
+              <label for="chatGptPrompt">Texto del punto 3 Estado para copiar en ChatGPT</label>
               <textarea id="chatGptPrompt" readonly placeholder="Pulsa Preparar texto para ChatGPT"></textarea>
             </div>
             <div>
-              <label for="chatGptResult">Respuesta mejorada de ChatGPT</label>
-              <textarea id="chatGptResult" placeholder="Pega aqui la respuesta redactada por ChatGPT"></textarea>
+              <label for="chatGptResult">Respuesta mejorada de ChatGPT para 3 Estado</label>
+              <textarea id="chatGptResult" placeholder="Pega aqui solo el texto mejorado del punto 3 Estado"></textarea>
             </div>
           </div>
           <div class="button-row" style="margin-top: 10px;">
@@ -1201,8 +1201,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
     }
 
     function composeEntryReport(data) {
-      const chatGptText = (data.chatGptResult || "").trim();
-      const sectionHtml = chatGptText ? formatChatGptReportHtml(chatGptText) : SECTIONS.map(section => {
+      const sectionHtml = SECTIONS.map(section => {
         const item = data.sections?.[section] || emptySection();
         const fixed = item.fixed.trim();
         const voice = item.voice.trim();
@@ -1225,13 +1224,13 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
 
       const text = [
         data.type,
-        ...(chatGptText ? [chatGptText] : SECTIONS.flatMap(section => {
+        ...SECTIONS.flatMap(section => {
           const item = data.sections?.[section] || emptySection();
           return [
             section,
             composeParagraph(section, item.fixed.trim(), item.voice.trim())
           ];
-        })),
+        }),
         "ANEXO FOTOGRÁFICO"
       ].join("\n\n");
 
@@ -1303,16 +1302,10 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
     }
 
     function buildChatGptPrompt(data) {
-      const sectionText = SECTIONS.map(section => {
-        const item = data.sections?.[section] || emptySection();
-        return [
-          section,
-          `Texto fijo: ${item.fixed.trim() || "Sin texto fijo."}`,
-          `Texto aportado/redactado: ${item.voice.trim() || "Sin texto aportado."}`
-        ].join("\n");
-      }).join("\n\n");
+      const stateSection = SECTIONS[2];
+      const item = data.sections?.[stateSection] || emptySection();
 
-      return `Quiero que redactes el texto definitivo de un informe tecnico de sistemas PCI.
+      return `Quiero que redactes solo el texto del apartado 3. Estado de un informe tecnico de sistemas PCI.
 
 Sistema: ${data.type}
 Cliente: ${data.meta?.client || appState.current.header || ""}
@@ -1324,14 +1317,19 @@ Criterio de redaccion:
 - Usa estilo tecnico, claro, directo y profesional.
 - No inventes datos que no aparezcan en la informacion aportada.
 - Desarrolla el texto de forma logica, como en informes anteriores de mantenimiento PCI.
-- Manten la estructura con estos apartados: 1. Antecedentes, 2. Comprobaciones realizadas, 3. Estado, 4. Normativa relacionada y 5. Conclusion.
-- Aprovecha el texto fijo como base y mejora el texto aportado por el usuario.
+- Redacta solamente el contenido del punto 3. Estado.
+- No escribas el titulo "3. Estado"; devuelve solo el texto que ira dentro del apartado.
+- Aprovecha el texto fijo como contexto, pero mejora solo el texto aportado/redactado por el usuario.
 - Si falta algun dato, no lo rellenes inventando; redacta de forma prudente.
-- No incluyas explicaciones sobre lo que has hecho. Devuelve solo el texto final del informe.
+- No incluyas explicaciones sobre lo que has hecho.
 
 Datos disponibles:
 
-${sectionText}`;
+Texto fijo del punto 3. Estado:
+${item.fixed.trim() || "Sin texto fijo."}
+
+Texto aportado/redactado por el usuario en 3. Estado:
+${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     function prepareChatGptPrompt() {
@@ -1368,10 +1366,14 @@ ${sectionText}`;
         setStatus(els.systemStatus, "Pega primero la respuesta de ChatGPT.", true);
         return;
       }
+      if (!data.sections[SECTIONS[2]]) data.sections[SECTIONS[2]] = emptySection();
+      data.sections[SECTIONS[2]].voice = data.chatGptResult.trim();
+      const stateVoiceField = els.sectionContainer.querySelector(`[data-voice="${CSS.escape(SECTIONS[2])}"]`);
+      if (stateVoiceField) stateVoiceField.value = data.sections[SECTIONS[2]].voice;
       data.mountedHtml = "";
       data.mountedText = "";
       saveState();
-      setStatus(els.systemStatus, "Texto de ChatGPT aplicado al informe.");
+      setStatus(els.systemStatus, "Texto de ChatGPT aplicado al punto 3. Estado.");
     }
 
     async function saveCurrentReport() {

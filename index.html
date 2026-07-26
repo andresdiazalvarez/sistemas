@@ -3,6 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#d7ff00">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="SISTEMAS">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <title>SISTEMAS</title>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -451,6 +458,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
+            <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
           <p class="subhead">Creación y archivo de informes técnicos por sistema.</p>
@@ -739,6 +747,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
     let activeEntryId = "";
     let previewMode = "entry";
     let activeRecognition = null;
+    let deferredInstallPrompt = null;
 
     const els = {
       homeScreen: document.getElementById("homeScreen"),
@@ -752,6 +761,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       preparedEntries: document.getElementById("preparedEntries"),
       savedReports: document.getElementById("savedReports"),
       homeStatus: document.getElementById("homeStatus"),
+      installAppBtn: document.getElementById("installAppBtn"),
       clearAppDataBtn: document.getElementById("clearAppDataBtn"),
       systemTitle: document.getElementById("systemTitle"),
       systemSubtitle: document.getElementById("systemSubtitle"),
@@ -1820,6 +1830,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     document.getElementById("viewAllBtn").addEventListener("click", viewCurrentSet);
     document.getElementById("deleteCurrentBtn").addEventListener("click", clearCurrentReport);
     els.clearAppDataBtn.addEventListener("click", clearAppData);
+    els.installAppBtn.addEventListener("click", async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      els.installAppBtn.hidden = true;
+    });
     document.getElementById("prepareChatGptBtn").addEventListener("click", prepareChatGptPrompt);
     document.getElementById("copyChatGptPromptBtn").addEventListener("click", copyChatGptPrompt);
     document.getElementById("applyChatGptResultBtn").addEventListener("click", applyChatGptResult);
@@ -1996,6 +2013,23 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       saveState();
       renderEntry(activeEntryId);
     });
+
+    window.addEventListener("beforeinstallprompt", event => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      els.installAppBtn.hidden = false;
+    });
+
+    window.addEventListener("appinstalled", () => {
+      deferredInstallPrompt = null;
+      els.installAppBtn.hidden = true;
+    });
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
 
     renderHome();
     restoreStateFromDb();

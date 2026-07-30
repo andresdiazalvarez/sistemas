@@ -190,6 +190,10 @@
       white-space: normal;
     }
 
+    .systems .btn.system-monoxide {
+      grid-column: 5;
+    }
+
     .prepared-list {
       display: grid;
       gap: 8px;
@@ -343,6 +347,8 @@
       font-size: 13pt;
       font-weight: 700;
       margin: 0 0 16px;
+      text-transform: uppercase;
+      line-height: 1.35;
     }
 
     .doc .doc-revision-row {
@@ -390,6 +396,15 @@
 
     .doc p { margin: 0 0 8px; }
 
+    .doc .doc-part,
+    .doc .doc-section,
+    .doc .photo-page,
+    .doc .photo-card,
+    .doc .summary-table {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
     .doc .photo-title {
       text-align: center;
       text-transform: uppercase;
@@ -402,13 +417,30 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
 
-    .doc .photo-grid img {
+    .doc .photo-page {
+      margin-bottom: 18px;
+    }
+
+    .doc .photo-page + .photo-page {
+      break-before: page;
+      page-break-before: always;
+    }
+
+    .doc .photo-card {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .doc .photo-card img {
       width: 100%;
       aspect-ratio: 4 / 3;
       object-fit: cover;
       border: 1px solid #ddd;
+      display: block;
     }
 
     .doc .blank-page {
@@ -438,6 +470,7 @@
 
     @media (max-width: 980px) {
       .systems, .photos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .systems .btn.system-monoxide { grid-column: auto; }
       .saved-item { grid-template-columns: 1fr; }
       .two-fields, .short-fields, .meta-grid { grid-template-columns: 1fr; }
       .prepared-item { grid-template-columns: 1fr; }
@@ -446,6 +479,7 @@
 
     @media (max-width: 560px) {
       .systems, .photos { grid-template-columns: 1fr; }
+      .systems .btn.system-monoxide { grid-column: auto; }
       .button-row .btn { flex: 1 1 180px; }
     }
   </style>
@@ -604,7 +638,8 @@
       "Central de Extinción de Incendios",
       "Extinción de Incendios",
       "Grupo de Presión Contra Incendios",
-      "Redes Contra Incendios"
+      "Redes Contra Incendios",
+      "Detección de monóxido"
     ];
 
     const SECTIONS = [
@@ -723,6 +758,18 @@ Real Decreto 164/2025, RSCIEI: Aplicable cuando la red de agua contra incendios 
         [SECTIONS[4]]: `La red de agua contra incendios ha sido revisada durante la intervención, comprobándose el estado general de los elementos visibles y accesibles que forman parte de la instalación. La revisión se ha centrado en las condiciones observadas de la red, incluyendo, según proceda, tuberías, válvulas, colectores, acometidas, elementos de sectorización, puntos de conexión, BIE, hidrantes, columna seca, señalización, accesibilidad y demás componentes asociados al suministro de agua para protección contra incendios.
 
 Las incidencias reflejadas en el informe corresponden al estado apreciado en la fecha de revisión y a las condiciones observadas durante las comprobaciones efectuadas. El informe queda limitado a dejar constancia técnica del estado de la red de agua PCI en el momento del mantenimiento, describiendo los elementos comprobados y las incidencias detectadas, sin incorporar actuaciones posteriores ni compromisos de corrección no realizados durante la intervención.`
+      },
+      [SYSTEMS[5]]: {
+        [SECTIONS[0]]: `Durante la revisión se comprueba el sistema de detección de monóxido de carbono instalado en la dependencia indicada. El informe recoge el estado observado en la central o equipo de control, detectores, señalización, alimentación, avisos, averías, alarmas, ventilación asociada cuando exista y demás elementos accesibles vinculados al sistema.`,
+        [SECTIONS[1]]: `Se realiza comprobación visual y funcional del sistema, revisando el estado general de los equipos, indicaciones de pantalla o pilotos, alimentación, baterías si procede, detectores de monóxido, líneas o zonas asociadas, señalización acústica/luminosa y comunicaciones con sistemas auxiliares. Las comprobaciones se documentan conforme al estado observado durante la intervención.`,
+        [SECTIONS[2]]: `El sistema queda descrito conforme al estado observado.`,
+        [SECTIONS[3]]: `El sistema de detección de monóxido se analiza dentro del marco normativo aplicable a las instalaciones de protección y seguridad del edificio, atendiendo a la reglamentación vigente, documentación técnica del fabricante, mantenimiento indicado para detectores de gases y normativa específica que resulte aplicable según el uso del recinto.
+
+Real Decreto 513/2017, RIPCI: Aplicable cuando el sistema forme parte de instalaciones vinculadas a protección contra incendios o seguridad asociada.
+Normativa técnica del fabricante: Referencia para comprobaciones, vida útil, calibración, mantenimiento y sustitución de detectores de monóxido.
+CTE DB-SI y normativa sectorial aplicable: Referencia cuando el sistema esté asociado a condiciones de seguridad en edificios.
+Instalaciones de detección de gases: Aplicables cuando existan detectores, centrales, señalización, ventilación o maniobras automáticas relacionadas con presencia de monóxido.`,
+        [SECTIONS[4]]: `El sistema de detección de monóxido ha sido revisado durante la intervención, comprobándose el estado general de los elementos visibles y accesibles. Las incidencias reflejadas corresponden a las condiciones observadas en la fecha de revisión y a las señales mostradas por los equipos comprobados. El informe deja constancia técnica del estado apreciado durante el mantenimiento, sin incluir actuaciones posteriores no ejecutadas en el momento de la inspección.`
       }
     };
 
@@ -945,10 +992,18 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         .replaceAll("'", "&#039;");
     }
 
-    function showScreen(name) {
+    function chunkArray(items, size) {
+      const chunks = [];
+      for (let index = 0; index < items.length; index += size) {
+        chunks.push(items.slice(index, index + size));
+      }
+      return chunks;
+    }
+
+    function showScreen(name, options = {}) {
       [els.homeScreen, els.systemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
       document.getElementById(name).classList.add("active");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (!options.keepScroll) window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function makeEntry(system) {
@@ -1030,7 +1085,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       els.revisionText.value = (appState.current.revisionText || "TRIMESTRAL").toUpperCase();
 
       els.systemButtons.innerHTML = SYSTEMS.map(system => `
-        <button class="btn lime" type="button" data-system="${escapeHtml(system)}">${escapeHtml(system)}</button>
+        <button class="btn lime ${system === SYSTEMS[5] ? "system-monoxide" : ""}" type="button" data-system="${escapeHtml(system)}">${escapeHtml(system)}</button>
       `).join("");
 
       els.preparedEntries.innerHTML = appState.current.entries.length
@@ -1064,7 +1119,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         : '<div class="empty">Todavía no hay informes grabados.</div>';
     }
 
-    function renderEntry(entryId) {
+    function renderEntry(entryId, options = {}) {
       activeEntryId = entryId;
       const data = ensureEntry(entryId);
       activeSystem = data.type;
@@ -1109,7 +1164,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       `).join("");
 
       setStatus(els.systemStatus, "");
-      showScreen("systemScreen");
+      showScreen("systemScreen", { keepScroll: options.keepScroll });
       saveState();
     }
 
@@ -1216,17 +1271,18 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
         const fixed = item.fixed.trim();
         const voice = item.voice.trim();
         const paragraph = composeParagraph(section, fixed, voice);
-        return `<h3>${escapeHtml(section)}</h3><p>${escapeHtml(paragraph)}</p>`;
+        return `<div class="doc-section"><h3>${escapeHtml(section)}</h3><p>${escapeHtml(paragraph)}</p></div>`;
       }).join("");
 
       const photos = (data.photos || []).filter(Boolean);
       const photoHtml = photos.length
-        ? `<div class="photo-title">ANEXO FOTOGRÁFICO</div><div class="photo-grid">${photos.map(src => `<img src="${src}" alt="">`).join("")}</div>`
+        ? `<div class="photo-title">ANEXO FOTOGRÁFICO</div>${chunkArray(photos, 4).map(group => `<div class="photo-page"><div class="photo-grid">${group.map(src => `<div class="photo-card"><img src="${src}" alt=""></div>`).join("")}</div></div>`).join("")}`
         : `<div class="photo-title">ANEXO FOTOGRÁFICO</div>`;
+      const systemHeading = buildSystemHeading(data);
 
       const html = `
         <section class="doc-part">
-          <div class="doc-system-title">${escapeHtml(data.type)}</div>
+          <div class="doc-system-title">${systemHeading}</div>
           ${sectionHtml}
           ${photoHtml}
         </section>
@@ -1245,6 +1301,15 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       ].join("\n\n");
 
       return { html, text };
+    }
+
+    function buildSystemHeading(data) {
+      const client = (data.meta?.client || "").trim();
+      const building = (data.meta?.building || "").trim();
+      const system = (data.meta?.system || data.type || "").trim();
+      return [client, building, system]
+        .map(value => escapeHtml(value.toUpperCase()))
+        .join("<br>");
     }
 
     function formatChatGptReportHtml(text) {
@@ -1686,12 +1751,14 @@ ${item.voice.trim() || "Sin texto aportado."}`;
             .summary-client { background: #d4c4f0; text-align: left; font-weight: 700; }
             .summary-head { background: #ae93e4; text-align: center; font-weight: 700; }
             .summary-table td { background: #e5dcf5; }
-            .doc-system-title { text-align: center; font-size: 13pt; font-weight: 700; margin-bottom: 16px; }
+            .doc-system-title { text-align: center; text-transform: uppercase; font-size: 13pt; font-weight: 700; line-height: 1.35; margin-bottom: 16px; }
             h3 { font-size: 11.5pt; margin: 14px 0 6px; }
             p { margin: 0 0 8px; }
+            .doc-part, .doc-section, .photo-page, .photo-card, .summary-table { page-break-inside: avoid; break-inside: avoid; }
             .photo-title { text-align: center; text-transform: uppercase; font-size: 14pt; font-weight: 700; margin: 22px 0 14px; }
             .photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-            .photo-grid img { width: 48%; margin: 1%; vertical-align: top; }
+            .photo-card { display: inline-block; width: 48%; margin: 1%; page-break-inside: avoid; vertical-align: top; }
+            .photo-card img { width: 100%; vertical-align: top; }
           </style>
         </head>
         <body>${html}</body>
@@ -1729,6 +1796,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       host.style.width = "794px";
       host.style.background = "#ffffff";
       host.style.padding = "32px";
+      host.style.boxSizing = "border-box";
       host.innerHTML = html;
       document.body.appendChild(host);
 
@@ -1747,12 +1815,14 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         const pageCanvas = document.createElement("canvas");
         const pageCtx = pageCanvas.getContext("2d");
         const sourcePageHeight = Math.floor((pageHeight - margin * 2) * canvas.width / imgWidth);
+        const protectedBlocks = getPdfProtectedBlocks(host, canvas);
         pageCanvas.width = canvas.width;
-        pageCanvas.height = sourcePageHeight;
 
         let sourceY = 0;
         let pageIndex = 0;
         while (sourceY < canvas.height) {
+          const sliceSourceHeight = getSafePdfSliceHeight(sourceY, sourcePageHeight, canvas.height, protectedBlocks);
+          pageCanvas.height = sliceSourceHeight;
           pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
           pageCtx.fillStyle = "#ffffff";
           pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
@@ -1761,23 +1831,55 @@ ${item.voice.trim() || "Sin texto aportado."}`;
             0,
             sourceY,
             canvas.width,
-            Math.min(sourcePageHeight, canvas.height - sourceY),
+            sliceSourceHeight,
             0,
             0,
             canvas.width,
-            Math.min(sourcePageHeight, canvas.height - sourceY)
+            sliceSourceHeight
           );
           if (pageIndex > 0) pdf.addPage();
           const pageData = pageCanvas.toDataURL("image/jpeg", 0.92);
-          const sliceHeight = Math.min(sourcePageHeight, canvas.height - sourceY) * imgWidth / canvas.width;
+          const sliceHeight = sliceSourceHeight * imgWidth / canvas.width;
           pdf.addImage(pageData, "JPEG", margin, margin, imgWidth, sliceHeight);
-          sourceY += sourcePageHeight;
+          sourceY += sliceSourceHeight;
           pageIndex += 1;
         }
         pdf.save(filename);
       } finally {
         host.remove();
       }
+    }
+
+    function getPdfProtectedBlocks(host, canvas) {
+      const hostRect = host.getBoundingClientRect();
+      const scale = canvas.width / hostRect.width;
+      return Array.from(host.querySelectorAll(".doc-section, .photo-card, .photo-page, .summary-table, .doc-revision-row, .doc-system-title"))
+        .map(element => {
+          const rect = element.getBoundingClientRect();
+          return {
+            top: Math.max(0, Math.floor((rect.top - hostRect.top) * scale)),
+            bottom: Math.max(0, Math.ceil((rect.bottom - hostRect.top) * scale))
+          };
+        })
+        .filter(block => block.bottom > block.top + 8)
+        .sort((a, b) => a.top - b.top);
+    }
+
+    function getSafePdfSliceHeight(sourceY, preferredHeight, totalHeight, blocks) {
+      const remaining = totalHeight - sourceY;
+      if (remaining <= preferredHeight) return remaining;
+
+      const desiredCut = sourceY + preferredHeight;
+      const minSlice = Math.floor(preferredHeight * 0.35);
+      const gap = 10;
+      const crossingBlock = blocks.find(block =>
+        block.top > sourceY + minSlice &&
+        block.top < desiredCut - gap &&
+        block.bottom > desiredCut
+      );
+
+      if (crossingBlock) return Math.max(minSlice, crossingBlock.top - sourceY - gap);
+      return preferredHeight;
     }
 
     function downloadBlob(bytes, type, filename) {
@@ -1997,7 +2099,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
           data.photos[index] = previous;
           return;
         }
-        renderEntry(activeEntryId);
+        renderEntry(activeEntryId, { keepScroll: true });
+        els.photoContainer.scrollIntoView({ block: "start" });
       } catch (error) {
         setStatus(els.systemStatus, "No se pudo cargar la imagen.", true);
       }

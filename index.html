@@ -1158,7 +1158,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       els.photoContainer.innerHTML = data.photos.map((photo, index) => `
         <div class="photo-slot">
           <div class="photo-preview">${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}`}</div>
-          <input type="file" accept="image/*" capture="environment" data-photo="${index}">
+          <input type="file" accept="image/*" data-photo="${index}">
           <button class="btn red" type="button" data-delete-photo="${index}">Eliminar foto</button>
         </div>
       `).join("");

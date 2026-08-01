@@ -316,7 +316,18 @@
       display: block;
     }
 
-    .photo-slot input { width: 100%; margin-bottom: 8px; }
+    .photo-inputs {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .photo-inputs label {
+      margin: 0;
+      font-size: .9rem;
+    }
+
+    .photo-slot input { width: 100%; }
     .photo-slot .btn { width: 100%; }
 
     .preview-shell {
@@ -1158,7 +1169,14 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       els.photoContainer.innerHTML = data.photos.map((photo, index) => `
         <div class="photo-slot">
           <div class="photo-preview">${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}`}</div>
-          <input type="file" accept="image/*" data-photo="${index}">
+          <div class="photo-inputs">
+            <label>Buscar imagen
+              <input type="file" accept="image/*" data-photo="${index}">
+            </label>
+            <label>Hacer foto
+              <input type="file" accept="image/*" capture="environment" data-photo="${index}">
+            </label>
+          </div>
           <button class="btn red" type="button" data-delete-photo="${index}">Eliminar foto</button>
         </div>
       `).join("");

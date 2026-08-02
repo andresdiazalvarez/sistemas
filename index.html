@@ -277,16 +277,17 @@
       border-radius: 8px;
       overflow: hidden;
       background: rgba(255, 255, 255, .76);
-      min-width: 860px;
+      min-width: 920px;
     }
 
     .listing-header,
     .listing-card {
       display: grid;
-      grid-template-columns: minmax(44px, 58px) minmax(78px, 96px) repeat(4, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: minmax(28px, .5fr) minmax(34px, .33fr) minmax(120px, 1.5fr) minmax(78px, 1fr) minmax(160px, 2fr) minmax(90px, 1fr);
+      gap: 6px;
       align-items: center;
-      padding: 12px;
+      padding: 8px;
+      font-size: .82rem;
     }
 
     .listing-header {
@@ -315,12 +316,25 @@
       display: none;
     }
 
+    .listing-card input[type="text"] {
+      min-height: 32px;
+      padding: 7px 7px;
+      font-size: .82rem;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
     .listing-card .field-num input {
       text-align: center;
+      padding-left: 3px;
+      padding-right: 3px;
     }
 
     .listing-card .btn {
       width: 100%;
+      min-height: 32px;
+      padding: 6px 4px;
+      font-size: .78rem;
     }
 
     .section-block {

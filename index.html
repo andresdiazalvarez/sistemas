@@ -269,17 +269,38 @@
     .listing-list {
       display: grid;
       gap: 10px;
+      overflow-x: auto;
+    }
+
+    .listing-table {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, .76);
+      min-width: 860px;
+    }
+
+    .listing-header,
+    .listing-card {
+      display: grid;
+      grid-template-columns: minmax(44px, 58px) minmax(78px, 96px) repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+    }
+
+    .listing-header {
+      background: var(--panel);
+      font-weight: 700;
+      border-bottom: 1px solid var(--line);
     }
 
     .listing-card {
-      display: grid;
-      grid-template-columns: minmax(54px, 72px) repeat(4, minmax(0, 1fr)) auto;
-      gap: 10px;
-      align-items: end;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, .76);
-      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .listing-card:last-child {
+      border-bottom: 0;
     }
 
     .listing-card.visto {
@@ -290,8 +311,16 @@
       margin: 0;
     }
 
+    .listing-card label {
+      display: none;
+    }
+
     .listing-card .field-num input {
       text-align: center;
+    }
+
+    .listing-card .btn {
+      width: 100%;
     }
 
     .section-block {
@@ -524,7 +553,6 @@
       .systems, .photos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .systems .btn.system-monoxide { grid-column: auto; }
       .saved-item { grid-template-columns: 1fr; }
-      .listing-card { grid-template-columns: 1fr 1fr; }
       .two-fields, .short-fields, .meta-grid { grid-template-columns: 1fr; }
       .prepared-item { grid-template-columns: 1fr; }
       .toolbar { align-items: flex-start; flex-direction: column; }
@@ -533,7 +561,6 @@
     @media (max-width: 560px) {
       .systems, .photos { grid-template-columns: 1fr; }
       .systems .btn.system-monoxide { grid-column: auto; }
-      .listing-card { grid-template-columns: 1fr; }
       .button-row .btn { flex: 1 1 180px; }
     }
   </style>
@@ -1245,31 +1272,43 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         ? `${listing.fileName} - ${listing.rows.length} registro(s)`
         : "Sin Excel cargado.";
       els.listingRows.innerHTML = listing.rows.length
-        ? listing.rows.map(row => `
-          <div class="listing-card ${row.visto ? "visto" : ""}" data-listing-id="${escapeHtml(row.id)}">
-            <div class="field field-num">
-              <label>Num</label>
-              <input type="text" data-listing-field="num" value="${escapeHtml(row.num)}">
+        ? `
+          <div class="listing-table">
+            <div class="listing-header">
+              <div>Num</div>
+              <div>Visto</div>
+              <div>Edificio</div>
+              <div>Planta</div>
+              <div>Sistema</div>
+              <div>Marca</div>
             </div>
-            <div class="field">
-              <label>Edificio</label>
-              <input type="text" data-listing-field="edificio" value="${escapeHtml(row.edificio)}">
-            </div>
-            <div class="field">
-              <label>Planta</label>
-              <input type="text" data-listing-field="planta" value="${escapeHtml(row.planta)}">
-            </div>
-            <div class="field">
-              <label>Sistema</label>
-              <input type="text" data-listing-field="sistema" value="${escapeHtml(row.sistema)}">
-            </div>
-            <div class="field">
-              <label>Marca</label>
-              <input type="text" data-listing-field="marca" value="${escapeHtml(row.marca)}">
-            </div>
-            <button class="btn ${row.visto ? "green" : "pink"}" type="button" data-listing-visto="${escapeHtml(row.id)}">Visto</button>
+            ${listing.rows.map(row => `
+              <div class="listing-card ${row.visto ? "visto" : ""}" data-listing-id="${escapeHtml(row.id)}">
+                <div class="field field-num">
+                  <label>Num</label>
+                  <input type="text" data-listing-field="num" value="${escapeHtml(row.num)}">
+                </div>
+                <button class="btn ${row.visto ? "green" : "pink"}" type="button" data-listing-visto="${escapeHtml(row.id)}">Visto</button>
+                <div class="field">
+                  <label>Edificio</label>
+                  <input type="text" data-listing-field="edificio" value="${escapeHtml(row.edificio)}">
+                </div>
+                <div class="field">
+                  <label>Planta</label>
+                  <input type="text" data-listing-field="planta" value="${escapeHtml(row.planta)}">
+                </div>
+                <div class="field">
+                  <label>Sistema</label>
+                  <input type="text" data-listing-field="sistema" value="${escapeHtml(row.sistema)}">
+                </div>
+                <div class="field">
+                  <label>Marca</label>
+                  <input type="text" data-listing-field="marca" value="${escapeHtml(row.marca)}">
+                </div>
+              </div>
+            `).join("")}
           </div>
-        `).join("")
+        `
         : '<div class="empty">No hay listado cargado.</div>';
       setStatus(els.listingStatus, "");
     }
@@ -1321,7 +1360,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
             return row[fallbackIndex] || "";
           };
           return normalizeListingRow({
-            num: hasHeaders ? getCell("num", 0) : oldFourColumnFormat ? String(rowIndex + 1) : getCell("num", 0),
+            num: String(rowIndex + 1),
             edificio: getCell("edificio", oldFourColumnFormat ? 0 : 1),
             planta: getCell("planta", oldFourColumnFormat ? 1 : 2),
             sistema: getCell("sistema", oldFourColumnFormat ? 2 : 3),
@@ -1345,11 +1384,28 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
     function downloadListingExcel() {
       const listing = appState.listing || emptyListing();
-      if (!listing.fileData) {
+      if (!listing.rows.length && !listing.fileData) {
         setStatus(els.listingStatus, "No hay Excel cargado para descargar.", true);
         return;
       }
-      downloadDataUrlFile(listing.fileData, listing.fileName || "listado.xlsx");
+      if (!window.XLSX || !listing.rows.length) {
+        downloadDataUrlFile(listing.fileData, listing.fileName || "listado.xlsx");
+        return;
+      }
+      const rows = listing.rows.map(row => ({
+        Num: row.num,
+        Visto: row.visto ? "SI" : "",
+        Edificio: row.edificio,
+        Planta: row.planta,
+        Sistema: row.sistema,
+        Marca: row.marca
+      }));
+      const workbook = XLSX.utils.book_new();
+      const sheet = XLSX.utils.json_to_sheet(rows, { header: ["Num", "Visto", "Edificio", "Planta", "Sistema", "Marca"] });
+      XLSX.utils.book_append_sheet(workbook, sheet, "LISTADO");
+      const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const fileName = (listing.fileName || "listado.xlsx").replace(/\.(xlsx|xls|csv)$/i, "") + "-listado.xlsx";
+      downloadBlob(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
     function deleteListingExcel() {

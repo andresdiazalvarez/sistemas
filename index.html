@@ -13,6 +13,7 @@
   <title>SISTEMAS</title>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --lime: #d7ff00;
@@ -179,6 +180,18 @@
 
     .field { margin-bottom: 16px; }
 
+    .hidden-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .listing-launch {
+      margin: 0 0 16px;
+    }
+
     .systems {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -251,6 +264,34 @@
     .saved-meta {
       color: var(--muted);
       overflow-wrap: anywhere;
+    }
+
+    .listing-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .listing-card {
+      display: grid;
+      grid-template-columns: minmax(54px, 72px) repeat(4, minmax(0, 1fr)) auto;
+      gap: 10px;
+      align-items: end;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .76);
+      padding: 12px;
+    }
+
+    .listing-card.visto {
+      background: #ecffd3;
+    }
+
+    .listing-card .field {
+      margin: 0;
+    }
+
+    .listing-card .field-num input {
+      text-align: center;
     }
 
     .section-block {
@@ -483,6 +524,7 @@
       .systems, .photos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .systems .btn.system-monoxide { grid-column: auto; }
       .saved-item { grid-template-columns: 1fr; }
+      .listing-card { grid-template-columns: 1fr 1fr; }
       .two-fields, .short-fields, .meta-grid { grid-template-columns: 1fr; }
       .prepared-item { grid-template-columns: 1fr; }
       .toolbar { align-items: flex-start; flex-direction: column; }
@@ -491,6 +533,7 @@
     @media (max-width: 560px) {
       .systems, .photos { grid-template-columns: 1fr; }
       .systems .btn.system-monoxide { grid-column: auto; }
+      .listing-card { grid-template-columns: 1fr; }
       .button-row .btn { flex: 1 1 180px; }
     }
   </style>
@@ -542,6 +585,10 @@
           </div>
         </div>
 
+        <div class="button-row listing-launch">
+          <button id="openListingBtn" class="btn pink" type="button">LISTADO</button>
+        </div>
+
         <h2 id="homeTitle">Sistemas</h2>
         <div id="systemButtons" class="systems"></div>
         <div id="preparedEntries" class="prepared-list"></div>
@@ -551,6 +598,29 @@
       <div class="panel">
         <h2>Informes grabados</h2>
         <div id="savedReports" class="saved-list"></div>
+      </div>
+    </section>
+
+    <section id="listingScreen" class="screen" aria-labelledby="listingTitle">
+      <div class="panel">
+        <div class="toolbar">
+          <div>
+            <h2 id="listingTitle">LISTADO</h2>
+            <p id="listingSubtitle" class="subhead">Sin Excel cargado.</p>
+          </div>
+          <button id="backFromListingBtn" class="btn" type="button">Volver</button>
+        </div>
+
+        <div class="button-row" style="margin-bottom: 14px;">
+          <label class="btn pink" for="listingFileInput">Cargar Excel</label>
+          <input id="listingFileInput" class="hidden-input" type="file" accept=".xlsx,.xls,.csv">
+          <button id="addListingRowBtn" class="btn pink" type="button">Añadir campo</button>
+          <button id="downloadListingBtn" class="btn green" type="button">Descargar Excel</button>
+          <button id="deleteListingBtn" class="btn red" type="button">Eliminar listado</button>
+        </div>
+
+        <div id="listingStatus" class="status" aria-live="polite"></div>
+        <div id="listingRows" class="listing-list"></div>
       </div>
     </section>
 
@@ -784,7 +854,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       }
     };
 
+    const LISTING_COLUMNS = ["num", "edificio", "planta", "sistema", "marca"];
     const emptySection = () => ({ fixed: "", voice: "" });
+    const emptyListing = () => ({ fileName: "", fileData: "", rows: [] });
 
     const defaultState = () => ({
       nextNumber: 1,
@@ -797,6 +869,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         entries: []
       },
       fixedTexts: cloneData(DEFAULT_FIXED_TEXTS),
+      listing: emptyListing(),
       savedReports: []
     });
 
@@ -809,6 +882,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
     const els = {
       homeScreen: document.getElementById("homeScreen"),
+      listingScreen: document.getElementById("listingScreen"),
       systemScreen: document.getElementById("systemScreen"),
       previewScreen: document.getElementById("previewScreen"),
       currentReportNumber: document.getElementById("currentReportNumber"),
@@ -821,6 +895,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       homeStatus: document.getElementById("homeStatus"),
       installAppBtn: document.getElementById("installAppBtn"),
       clearAppDataBtn: document.getElementById("clearAppDataBtn"),
+      listingSubtitle: document.getElementById("listingSubtitle"),
+      listingFileInput: document.getElementById("listingFileInput"),
+      listingRows: document.getElementById("listingRows"),
+      listingStatus: document.getElementById("listingStatus"),
       systemTitle: document.getElementById("systemTitle"),
       systemSubtitle: document.getElementById("systemSubtitle"),
       sectionContainer: document.getElementById("sectionContainer"),
@@ -873,8 +951,30 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       state.current.entries = Array.isArray(state.current.entries) ? state.current.entries : entriesFromSystems(state.current.systems);
       state.current.editingId = state.current.editingId || null;
       state.fixedTexts = mergeDefaultFixedTexts(state.fixedTexts || {});
+      state.listing = normalizeListing(state.listing);
       state.savedReports = Array.isArray(state.savedReports) ? state.savedReports : [];
       return state;
+    }
+
+    function normalizeListing(listing) {
+      const data = listing && typeof listing === "object" ? listing : {};
+      return {
+        fileName: data.fileName || "",
+        fileData: data.fileData || "",
+        rows: Array.isArray(data.rows) ? data.rows.map(normalizeListingRow) : []
+      };
+    }
+
+    function normalizeListingRow(row) {
+      return {
+        id: row.id || makeId(),
+        num: String(row.num || ""),
+        edificio: String(row.edificio || ""),
+        planta: String(row.planta || ""),
+        sistema: String(row.sistema || ""),
+        marca: String(row.marca || ""),
+        visto: Boolean(row.visto)
+      };
     }
 
     function mergeDefaultFixedTexts(fixedTexts) {
@@ -916,6 +1016,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function stripHeavyReportData(state) {
+      if (state.listing) state.listing.fileData = "";
       (state.current?.entries || []).forEach(entry => stripHeavyEntryData(entry));
       (state.savedReports || []).forEach(report => {
         (report.sourceEntries || []).forEach(entry => stripHeavyEntryData(entry));
@@ -971,7 +1072,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       const dbSavedCount = Array.isArray(stored.savedReports) ? stored.savedReports.length : 0;
       const localPhotoCount = countPhotos(appState);
       const dbPhotoCount = countPhotos(stored);
-      if (dbSavedCount > localSavedCount || dbPhotoCount > localPhotoCount) {
+      const localListingCount = countListing(appState);
+      const dbListingCount = countListing(stored);
+      if (dbSavedCount > localSavedCount || dbPhotoCount > localPhotoCount || dbListingCount > localListingCount) {
         appState = stored;
         normalizeLoadedState(appState);
         renderHome();
@@ -987,6 +1090,11 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         return count + fromEntries + fromSystems;
       }, 0);
       return currentPhotos + savedPhotos;
+    }
+
+    function countListing(state) {
+      const listing = state.listing || {};
+      return (listing.rows || []).length + (listing.fileData ? 1 : 0);
     }
 
     function setStatus(el, message, isError = false) {
@@ -1012,7 +1120,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function showScreen(name, options = {}) {
-      [els.homeScreen, els.systemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
+      [els.homeScreen, els.listingScreen, els.systemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
       document.getElementById(name).classList.add("active");
       if (!options.keepScroll) window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1128,6 +1236,142 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
           </div>
         `).join("")
         : '<div class="empty">Todavía no hay informes grabados.</div>';
+    }
+
+    function renderListing() {
+      appState.listing = normalizeListing(appState.listing);
+      const listing = appState.listing;
+      els.listingSubtitle.textContent = listing.fileName
+        ? `${listing.fileName} - ${listing.rows.length} registro(s)`
+        : "Sin Excel cargado.";
+      els.listingRows.innerHTML = listing.rows.length
+        ? listing.rows.map(row => `
+          <div class="listing-card ${row.visto ? "visto" : ""}" data-listing-id="${escapeHtml(row.id)}">
+            <div class="field field-num">
+              <label>Num</label>
+              <input type="text" data-listing-field="num" value="${escapeHtml(row.num)}">
+            </div>
+            <div class="field">
+              <label>Edificio</label>
+              <input type="text" data-listing-field="edificio" value="${escapeHtml(row.edificio)}">
+            </div>
+            <div class="field">
+              <label>Planta</label>
+              <input type="text" data-listing-field="planta" value="${escapeHtml(row.planta)}">
+            </div>
+            <div class="field">
+              <label>Sistema</label>
+              <input type="text" data-listing-field="sistema" value="${escapeHtml(row.sistema)}">
+            </div>
+            <div class="field">
+              <label>Marca</label>
+              <input type="text" data-listing-field="marca" value="${escapeHtml(row.marca)}">
+            </div>
+            <button class="btn ${row.visto ? "green" : "pink"}" type="button" data-listing-visto="${escapeHtml(row.id)}">Visto</button>
+          </div>
+        `).join("")
+        : '<div class="empty">No hay listado cargado.</div>';
+      setStatus(els.listingStatus, "");
+    }
+
+    async function loadListingExcel(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const [arrayBuffer, fileData] = await Promise.all([
+          file.arrayBuffer(),
+          fileToDataUrl(file)
+        ]);
+        const rows = parseListingWorkbook(arrayBuffer);
+        appState.listing = {
+          fileName: file.name,
+          fileData,
+          rows
+        };
+        saveState();
+        renderListing();
+        setStatus(els.listingStatus, `${rows.length} registro(s) cargado(s).`);
+      } catch (error) {
+        setStatus(els.listingStatus, "No se pudo leer el Excel. Revisa que sea .xlsx, .xls o .csv.", true);
+      } finally {
+        event.target.value = "";
+      }
+    }
+
+    function parseListingWorkbook(arrayBuffer) {
+      if (!window.XLSX) throw new Error("XLSX no disponible");
+      const workbook = XLSX.read(arrayBuffer, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) return [];
+      const sheet = workbook.Sheets[firstSheetName];
+      const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      if (!matrix.length) return [];
+      const headers = matrix[0].map(normalizeListingHeader);
+      const hasHeaders = LISTING_COLUMNS.some(column => headers.includes(column));
+      const rows = hasHeaders ? matrix.slice(1) : matrix;
+      return rows
+        .filter(row => row.some(cell => String(cell || "").trim()))
+        .map((row, rowIndex) => {
+          const oldFourColumnFormat = !hasHeaders && row.length <= 4;
+          const getCell = (column, fallbackIndex) => {
+            if (hasHeaders) {
+              const headerIndex = headers.indexOf(column);
+              return headerIndex >= 0 ? row[headerIndex] : "";
+            }
+            return row[fallbackIndex] || "";
+          };
+          return normalizeListingRow({
+            num: hasHeaders ? getCell("num", 0) : oldFourColumnFormat ? String(rowIndex + 1) : getCell("num", 0),
+            edificio: getCell("edificio", oldFourColumnFormat ? 0 : 1),
+            planta: getCell("planta", oldFourColumnFormat ? 1 : 2),
+            sistema: getCell("sistema", oldFourColumnFormat ? 2 : 3),
+            marca: getCell("marca", oldFourColumnFormat ? 3 : 4),
+            visto: false
+          });
+        });
+    }
+
+    function normalizeListingHeader(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+    }
+
+    function getListingRow(id) {
+      return (appState.listing?.rows || []).find(row => row.id === id);
+    }
+
+    function downloadListingExcel() {
+      const listing = appState.listing || emptyListing();
+      if (!listing.fileData) {
+        setStatus(els.listingStatus, "No hay Excel cargado para descargar.", true);
+        return;
+      }
+      downloadDataUrlFile(listing.fileData, listing.fileName || "listado.xlsx");
+    }
+
+    function deleteListingExcel() {
+      appState.listing = emptyListing();
+      saveState();
+      renderListing();
+      setStatus(els.listingStatus, "Listado eliminado.");
+    }
+
+    function addListingRow() {
+      appState.listing = normalizeListing(appState.listing);
+      appState.listing.rows.push(normalizeListingRow({
+        num: String(appState.listing.rows.length + 1),
+        edificio: "",
+        planta: "",
+        sistema: "",
+        marca: "",
+        visto: false
+      }));
+      saveState();
+      renderListing();
+      setStatus(els.listingStatus, "Campo añadido.");
     }
 
     function renderEntry(entryId, options = {}) {
@@ -1912,6 +2156,15 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       URL.revokeObjectURL(url);
     }
 
+    function downloadDataUrlFile(dataUrl, filename) {
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
     function getReport(id) {
       return appState.savedReports.find(report => report.id === id);
     }
@@ -1949,6 +2202,18 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     document.getElementById("saveCurrentBtn").addEventListener("click", saveCurrentReport);
     document.getElementById("viewAllBtn").addEventListener("click", viewCurrentSet);
     document.getElementById("deleteCurrentBtn").addEventListener("click", clearCurrentReport);
+    document.getElementById("openListingBtn").addEventListener("click", () => {
+      renderListing();
+      showScreen("listingScreen");
+    });
+    document.getElementById("backFromListingBtn").addEventListener("click", () => {
+      renderHome();
+      showScreen("homeScreen");
+    });
+    document.getElementById("addListingRowBtn").addEventListener("click", addListingRow);
+    document.getElementById("downloadListingBtn").addEventListener("click", downloadListingExcel);
+    document.getElementById("deleteListingBtn").addEventListener("click", deleteListingExcel);
+    els.listingFileInput.addEventListener("change", loadListingExcel);
     els.clearAppDataBtn.addEventListener("click", clearAppData);
     els.installAppBtn.addEventListener("click", async () => {
       if (!deferredInstallPrompt) return;
@@ -2034,6 +2299,26 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       appState.current.revisionText = els.revisionText.value.toUpperCase();
       els.revisionText.value = appState.current.revisionText;
       saveState();
+    });
+
+    els.listingRows.addEventListener("input", event => {
+      const input = event.target.closest("[data-listing-field]");
+      if (!input) return;
+      const card = input.closest("[data-listing-id]");
+      const row = card ? getListingRow(card.dataset.listingId) : null;
+      if (!row) return;
+      row[input.dataset.listingField] = input.value;
+      saveState();
+    });
+
+    els.listingRows.addEventListener("click", event => {
+      const button = event.target.closest("[data-listing-visto]");
+      if (!button) return;
+      const row = getListingRow(button.dataset.listingVisto);
+      if (!row) return;
+      row.visto = !row.visto;
+      saveState();
+      renderListing();
     });
 
     els.systemButtons.addEventListener("click", event => {

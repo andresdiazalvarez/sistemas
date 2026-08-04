@@ -2121,65 +2121,140 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     async function downloadPdfFromHtml(html, filename) {
       const { jsPDF } = window.jspdf;
-      const host = document.createElement("div");
-      host.style.position = "fixed";
-      host.style.left = "-10000px";
-      host.style.top = "0";
-      host.style.width = "794px";
-      host.style.background = "#ffffff";
-      host.style.padding = "32px";
-      host.style.boxSizing = "border-box";
-      host.innerHTML = html;
-      document.body.appendChild(host);
+      const pdf = new jsPDF({ unit: "pt", format: "a4" });
+      const pageState = { count: 0 };
+      const renderHost = document.createElement("div");
+      renderHost.style.position = "absolute";
+      renderHost.style.left = "0";
+      renderHost.style.top = "0";
+      renderHost.style.width = "794px";
+      renderHost.style.background = "#ffffff";
+      renderHost.style.padding = "32px";
+      renderHost.style.boxSizing = "border-box";
+      renderHost.style.pointerEvents = "none";
+      renderHost.style.zIndex = "-1";
+      document.body.appendChild(renderHost);
 
       try {
-        const canvas = await html2canvas(host, {
-          scale: 2,
-          backgroundColor: "#ffffff",
-          useCORS: true
-        });
-        const pdf = new jsPDF({ unit: "pt", format: "a4" });
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 28;
-        const imgWidth = pageWidth - margin * 2;
-        const imgHeight = canvas.height * imgWidth / canvas.width;
-        const pageCanvas = document.createElement("canvas");
-        const pageCtx = pageCanvas.getContext("2d");
-        const sourcePageHeight = Math.floor((pageHeight - margin * 2) * canvas.width / imgWidth);
-        const protectedBlocks = getPdfProtectedBlocks(host, canvas);
-        pageCanvas.width = canvas.width;
-
-        let sourceY = 0;
-        let pageIndex = 0;
-        while (sourceY < canvas.height) {
-          const sliceSourceHeight = getSafePdfSliceHeight(sourceY, sourcePageHeight, canvas.height, protectedBlocks);
-          pageCanvas.height = sliceSourceHeight;
-          pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
-          pageCtx.fillStyle = "#ffffff";
-          pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-          pageCtx.drawImage(
-            canvas,
-            0,
-            sourceY,
-            canvas.width,
-            sliceSourceHeight,
-            0,
-            0,
-            canvas.width,
-            sliceSourceHeight
-          );
-          if (pageIndex > 0) pdf.addPage();
-          const pageData = pageCanvas.toDataURL("image/jpeg", 0.92);
-          const sliceHeight = sliceSourceHeight * imgWidth / canvas.width;
-          pdf.addImage(pageData, "JPEG", margin, margin, imgWidth, sliceHeight);
-          sourceY += sliceSourceHeight;
-          pageIndex += 1;
+        const units = createPdfRenderUnits(html);
+        for (const unit of units) {
+          if (unit.type === "blank") {
+            addBlankPdfPage(pdf, pageState);
+            continue;
+          }
+          renderHost.innerHTML = "";
+          renderHost.appendChild(unit.element);
+          await waitForImages(renderHost);
+          await addElementToPdf(pdf, renderHost, pageState);
         }
+        if (!pageState.count) addBlankPdfPage(pdf, pageState);
         pdf.save(filename);
       } finally {
-        host.remove();
+        renderHost.remove();
       }
+    }
+
+    function createPdfRenderUnits(html) {
+      const template = document.createElement("template");
+      template.innerHTML = html.trim();
+      const source = template.content.querySelector(".doc") || template.content;
+      const children = Array.from(source.children);
+      if (!children.length) return [makePdfContentUnit(Array.from(template.content.childNodes).map(node => node.cloneNode(true)))];
+
+      const units = [];
+      let coverNodes = [];
+      const flushCover = () => {
+        if (!coverNodes.length) return;
+        units.push(makePdfContentUnit(coverNodes));
+        coverNodes = [];
+      };
+
+      children.forEach(child => {
+        if (child.classList.contains("blank-page")) {
+          flushCover();
+          units.push({ type: "blank" });
+          return;
+        }
+        if (child.classList.contains("doc-part")) {
+          flushCover();
+          units.push(makePdfContentUnit([child.cloneNode(true)]));
+          return;
+        }
+        coverNodes.push(child.cloneNode(true));
+      });
+      flushCover();
+      return units;
+    }
+
+    function makePdfContentUnit(nodes) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "doc";
+      nodes.forEach(node => wrapper.appendChild(node));
+      return { type: "content", element: wrapper };
+    }
+
+    function waitForImages(root) {
+      const images = Array.from(root.querySelectorAll("img"));
+      return Promise.all(images.map(image => {
+        if (image.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          image.onload = resolve;
+          image.onerror = resolve;
+        });
+      }));
+    }
+
+    async function addElementToPdf(pdf, element, pageState) {
+      const canvas = await html2canvas(element, {
+        scale: 1.6,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        windowWidth: 794
+      });
+      if (!canvas.width || !canvas.height) return;
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 28;
+      const imgWidth = pageWidth - margin * 2;
+      const pageCanvas = document.createElement("canvas");
+      const pageCtx = pageCanvas.getContext("2d");
+      const sourcePageHeight = Math.floor((pageHeight - margin * 2) * canvas.width / imgWidth);
+      const protectedBlocks = getPdfProtectedBlocks(element, canvas);
+      pageCanvas.width = canvas.width;
+
+      let sourceY = 0;
+      while (sourceY < canvas.height) {
+        const sliceSourceHeight = getSafePdfSliceHeight(sourceY, sourcePageHeight, canvas.height, protectedBlocks);
+        pageCanvas.height = sliceSourceHeight;
+        pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+        pageCtx.fillStyle = "#ffffff";
+        pageCtx.fillRect(0, 0, pageCanvas.width, sliceSourceHeight);
+        pageCtx.drawImage(
+          canvas,
+          0,
+          sourceY,
+          canvas.width,
+          sliceSourceHeight,
+          0,
+          0,
+          canvas.width,
+          sliceSourceHeight
+        );
+        if (pageState.count > 0) pdf.addPage();
+        const pageData = pageCanvas.toDataURL("image/jpeg", 0.92);
+        const sliceHeight = sliceSourceHeight * imgWidth / canvas.width;
+        pdf.addImage(pageData, "JPEG", margin, margin, imgWidth, sliceHeight);
+        pageState.count += 1;
+        sourceY += sliceSourceHeight;
+      }
+    }
+
+    function addBlankPdfPage(pdf, pageState) {
+      if (pageState.count > 0) pdf.addPage();
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), "F");
+      pageState.count += 1;
     }
 
     function getPdfProtectedBlocks(host, canvas) {

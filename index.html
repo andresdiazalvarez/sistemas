@@ -228,6 +228,12 @@
       display: block;
     }
 
+    .prepared-meta {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+      margin-top: 3px;
+    }
+
     .short-fields {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1236,6 +1242,28 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       return target;
     }
 
+    function systemListTitle(entry) {
+      const meta = entry.meta || {};
+      const client = (meta.client || appState.current.header || "Sin cliente").trim();
+      const building = (meta.building || "Sin edificio").trim();
+      const denomination = (meta.denomination || meta.system || entry.type || "Sin denominación").trim();
+      return `${client.toUpperCase()} - ${building.toUpperCase()} - ${denomination.toUpperCase()}`;
+    }
+
+    function systemListMeta(entry) {
+      const meta = entry.meta || {};
+      const system = (meta.system || entry.type || "").trim();
+      const client = (meta.client || appState.current.header || "Sin cliente").trim();
+      const building = (meta.building || "Sin edificio").trim();
+      const denomination = (meta.denomination || system || "Sin denominación").trim();
+      return `Cliente: ${client} | Edificio: ${building} | Sistema: ${system} | Denominación: ${denomination}`;
+    }
+
+    function savedReportTitle(report) {
+      const header = (report.header || "").trim().toUpperCase();
+      return header ? `Informe ${report.number} - ${header}` : `Informe ${report.number}`;
+    }
+
     function renderHome() {
       normalizeSavedReports();
       appState.current.number = appState.current.number || appState.nextNumber || 1;
@@ -1252,7 +1280,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         ? appState.current.entries.map((entry, index) => `
           <div class="prepared-item">
             <div>
-              <strong>${index + 1}. ${escapeHtml(entry.type)}</strong>
+              <strong>${index + 1}. ${escapeHtml(systemListTitle(entry))}</strong>
+              <div class="prepared-meta">${escapeHtml(systemListMeta(entry))}</div>
             </div>
             <div class="button-row">
               <button class="btn blue" type="button" data-edit-entry="${entry.id}">Editar</button>
@@ -1266,8 +1295,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       els.savedReports.innerHTML = reports.length
         ? reports.map(report => `
           <div class="saved-item">
-            <div class="saved-title">Informe ${report.number}</div>
-            <div class="saved-meta">${escapeHtml((report.header || "").toUpperCase())}<br>${report.systems.length} sistema(s) grabado(s)</div>
+            <div class="saved-title">${escapeHtml(savedReportTitle(report))}</div>
+            <div class="saved-meta">${report.systems.length} sistema(s) grabado(s)</div>
             <div class="button-row">
               <button class="btn pink" type="button" data-action="open" data-id="${report.id}">Abrir / rectificar</button>
               <button class="btn green" type="button" data-action="pdf" data-id="${report.id}">PDF</button>

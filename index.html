@@ -254,22 +254,49 @@
 
     .saved-item {
       display: grid;
-      grid-template-columns: minmax(120px, .35fr) minmax(180px, 1fr) auto;
+      grid-template-columns: minmax(120px, .35fr) minmax(160px, .45fr) minmax(180px, 1fr) auto;
       gap: 10px;
       align-items: center;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
       padding: 12px;
+      text-align: left;
+      width: 100%;
     }
 
     .saved-title {
       font-weight: 700;
     }
 
+    .saved-revision {
+      font-weight: 700;
+      color: var(--ink);
+    }
+
     .saved-meta {
       color: var(--muted);
       overflow-wrap: anywhere;
+    }
+
+    .report-actions {
+      margin: 14px 0 18px;
+    }
+
+    .report-notes {
+      min-height: 180px;
+    }
+
+    .delete-report-wide {
+      width: 100%;
+      min-height: 76px;
+      margin-top: 22px;
+      background: var(--lime);
+      border-color: var(--lime-strong);
+      color: var(--red);
+      font-size: clamp(1.7rem, 4vw, 2.8rem);
+      font-weight: 900;
+      line-height: 1;
     }
 
     .listing-list {
@@ -671,6 +698,38 @@
       </div>
     </section>
 
+    <section id="reportScreen" class="screen" aria-labelledby="reportDetailTitle">
+      <div class="panel">
+        <div class="toolbar">
+          <div>
+            <h2 id="reportDetailTitle">Informe</h2>
+            <p id="reportDetailSubtitle" class="subhead"></p>
+          </div>
+          <button id="backFromReportBtn" class="btn" type="button">Volver</button>
+        </div>
+
+        <div class="button-row report-actions">
+          <button id="saveReportDetailBtn" class="btn pink" type="button">Grabar</button>
+          <button id="viewReportDetailBtn" class="btn violet" type="button">Ver conjunto</button>
+          <button id="downloadReportDetailPdfBtn" class="btn green" type="button">Descargar PDF</button>
+          <button id="downloadReportDetailWordBtn" class="btn blue" type="button">Descargar Word</button>
+        </div>
+
+        <h2>Sistemas</h2>
+        <div id="reportSystemButtons" class="systems"></div>
+
+        <div class="field" style="margin-top: 16px;">
+          <label for="reportNotes">Datos del informe</label>
+          <textarea id="reportNotes" class="report-notes" placeholder="Escribe aqui todos los datos que necesites guardar dentro de este informe"></textarea>
+        </div>
+
+        <div id="reportPreparedEntries" class="prepared-list"></div>
+        <div id="reportStatus" class="status" aria-live="polite"></div>
+
+        <button id="deleteReportDetailBtn" class="btn delete-report-wide" type="button">ELIMINAR INFORME</button>
+      </div>
+    </section>
+
     <section id="systemScreen" class="screen" aria-labelledby="systemTitle">
       <div class="panel">
         <div class="toolbar">
@@ -913,7 +972,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         revisionNumber: "1 RT-2026",
         revisionText: "TRIMESTRAL",
         systems: {},
-        entries: []
+        entries: [],
+        notes: ""
       },
       fixedTexts: cloneData(DEFAULT_FIXED_TEXTS),
       listing: emptyListing(),
@@ -924,12 +984,15 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     let activeSystem = "";
     let activeEntryId = "";
     let previewMode = "entry";
+    let systemReturnScreen = "home";
+    let previewReturnScreen = "home";
     let activeRecognition = null;
     let deferredInstallPrompt = null;
 
     const els = {
       homeScreen: document.getElementById("homeScreen"),
       listingScreen: document.getElementById("listingScreen"),
+      reportScreen: document.getElementById("reportScreen"),
       systemScreen: document.getElementById("systemScreen"),
       previewScreen: document.getElementById("previewScreen"),
       currentReportNumber: document.getElementById("currentReportNumber"),
@@ -946,6 +1009,12 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       listingFileInput: document.getElementById("listingFileInput"),
       listingRows: document.getElementById("listingRows"),
       listingStatus: document.getElementById("listingStatus"),
+      reportDetailTitle: document.getElementById("reportDetailTitle"),
+      reportDetailSubtitle: document.getElementById("reportDetailSubtitle"),
+      reportSystemButtons: document.getElementById("reportSystemButtons"),
+      reportPreparedEntries: document.getElementById("reportPreparedEntries"),
+      reportNotes: document.getElementById("reportNotes"),
+      reportStatus: document.getElementById("reportStatus"),
       systemTitle: document.getElementById("systemTitle"),
       systemSubtitle: document.getElementById("systemSubtitle"),
       sectionContainer: document.getElementById("sectionContainer"),
@@ -997,9 +1066,13 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       state.current.systems = state.current.systems || {};
       state.current.entries = Array.isArray(state.current.entries) ? state.current.entries : entriesFromSystems(state.current.systems);
       state.current.editingId = state.current.editingId || null;
+      state.current.notes = state.current.notes || "";
       state.fixedTexts = mergeDefaultFixedTexts(state.fixedTexts || {});
       state.listing = normalizeListing(state.listing);
       state.savedReports = Array.isArray(state.savedReports) ? state.savedReports : [];
+      state.savedReports.forEach(report => {
+        report.notes = report.notes || "";
+      });
       return state;
     }
 
@@ -1167,7 +1240,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function showScreen(name, options = {}) {
-      [els.homeScreen, els.listingScreen, els.systemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
+      [els.homeScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
       document.getElementById(name).classList.add("active");
       if (!options.keepScroll) window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1264,6 +1337,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       return header ? `Informe ${report.number} - ${header}` : `Informe ${report.number}`;
     }
 
+    function currentReportTitle() {
+      return savedReportTitle(appState.current);
+    }
+
     function renderHome() {
       normalizeSavedReports();
       appState.current.number = appState.current.number || appState.nextNumber || 1;
@@ -1294,18 +1371,52 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       const reports = [...appState.savedReports].sort((a, b) => Number(a.number) - Number(b.number));
       els.savedReports.innerHTML = reports.length
         ? reports.map(report => `
-          <div class="saved-item">
+          <div class="saved-item" data-action="open" data-id="${report.id}">
             <div class="saved-title">${escapeHtml(savedReportTitle(report))}</div>
-            <div class="saved-meta">${report.systems.length} sistema(s) grabado(s)</div>
+            <div class="saved-revision">Nº revisión: ${escapeHtml(report.revisionNumber || "1 RT-2026")}<br>Revisión: ${escapeHtml(report.revisionText || "TRIMESTRAL")}</div>
+            <div class="saved-meta">Cabecera: ${escapeHtml((report.header || "").toUpperCase() || "SIN CABECERA")}<br>${report.systems.length} sistema(s) grabado(s)</div>
             <div class="button-row">
-              <button class="btn pink" type="button" data-action="open" data-id="${report.id}">Abrir / rectificar</button>
               <button class="btn green" type="button" data-action="pdf" data-id="${report.id}">PDF</button>
               <button class="btn blue" type="button" data-action="word" data-id="${report.id}">Word</button>
-              <button class="btn red" type="button" data-action="delete" data-id="${report.id}">Borrar</button>
             </div>
           </div>
         `).join("")
         : '<div class="empty">Todavía no hay informes grabados.</div>';
+    }
+
+    function renderPreparedEntries(target) {
+      const container = target === "report" ? els.reportPreparedEntries : els.preparedEntries;
+      container.innerHTML = appState.current.entries.length
+        ? appState.current.entries.map((entry, index) => `
+          <div class="prepared-item">
+            <div>
+              <strong>${index + 1}. ${escapeHtml(systemListTitle(entry))}</strong>
+              <div class="prepared-meta">${escapeHtml(systemListMeta(entry))}</div>
+            </div>
+            <div class="button-row">
+              <button class="btn blue" type="button" data-edit-entry="${entry.id}">Editar</button>
+              <button class="btn red" type="button" data-remove-entry="${entry.id}">Quitar</button>
+            </div>
+          </div>
+        `).join("")
+        : '<div class="empty">Pulsa un sistema amarillo para añadirlo a este informe.</div>';
+    }
+
+    function renderReportScreen() {
+      els.reportDetailTitle.textContent = currentReportTitle();
+      els.reportDetailSubtitle.textContent = `Nº revisión: ${appState.current.revisionNumber || "1 RT-2026"} | Revisión: ${appState.current.revisionText || "TRIMESTRAL"}`;
+      els.reportNotes.value = appState.current.notes || "";
+      els.reportSystemButtons.innerHTML = SYSTEMS.map(system => `
+        <button class="btn lime ${system === SYSTEMS[5] ? "system-monoxide" : ""}" type="button" data-system="${escapeHtml(system)}">${escapeHtml(system)}</button>
+      `).join("");
+      renderPreparedEntries("report");
+      setStatus(els.reportStatus, "");
+    }
+
+    function showCurrentReportScreen(message = "") {
+      renderReportScreen();
+      if (message) setStatus(els.reportStatus, message);
+      showScreen("reportScreen");
     }
 
     function renderListing() {
@@ -1692,6 +1803,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       const header = (report.header || "INFORME").toUpperCase();
       const revisionNumber = (report.revisionNumber || "1 RT-2026").toUpperCase();
       const revisionText = (report.revisionText || "TRIMESTRAL").toUpperCase();
+      const notes = (report.notes || "").trim();
       const rows = report.systems.map(system => `
         <tr>
           <td>${escapeHtml(system.meta?.building || "")}</td>
@@ -1715,6 +1827,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
           </tr>
           ${rows || '<tr><td></td><td></td><td></td></tr>'}
         </table>
+        ${notes ? `<div class="doc-section"><h3>Datos del informe</h3><p>${escapeHtml(notes)}</p></div>` : ""}
       `;
     }
 
@@ -1830,6 +1943,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         header: appState.current.header,
         revisionNumber: appState.current.revisionNumber,
         revisionText: appState.current.revisionText,
+        notes: appState.current.notes || "",
         systems,
         sourceSystems: cloneData(appState.current.systems),
         sourceEntries: cloneData(appState.current.entries),
@@ -1851,6 +1965,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         revisionText: "TRIMESTRAL",
         systems: {},
         entries: [],
+        notes: "",
         editingId: null
       };
       const dbOk = await saveStateToDb(appState);
@@ -1868,6 +1983,55 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       renderHome();
       setStatus(els.homeStatus, `Informe ${report.number} grabado.`);
       showScreen("homeScreen");
+    }
+
+    async function saveReportDetail() {
+      saveSystemInputs();
+      appState.current.notes = els.reportNotes.value;
+      const systems = collectCurrentSystems();
+      const existingIndex = appState.savedReports.findIndex(report => report.id === appState.current.editingId);
+      if (existingIndex < 0) {
+        await saveCurrentReport();
+        return;
+      }
+
+      appState.savedReports[existingIndex] = {
+        ...appState.savedReports[existingIndex],
+        number: appState.current.number,
+        header: appState.current.header,
+        revisionNumber: appState.current.revisionNumber,
+        revisionText: appState.current.revisionText,
+        notes: appState.current.notes || "",
+        systems,
+        sourceSystems: cloneData(appState.current.systems),
+        sourceEntries: cloneData(appState.current.entries),
+        updatedAt: new Date().toISOString()
+      };
+      normalizeSavedReports();
+      appState.nextNumber = getNextReportNumber();
+      saveState();
+      showCurrentReportScreen("Informe grabado.");
+    }
+
+    function deleteCurrentSavedReport() {
+      if (!appState.current.editingId) return;
+      const deletedNumber = appState.current.number;
+      appState.savedReports = appState.savedReports.filter(report => report.id !== appState.current.editingId);
+      appState.nextNumber = getNextReportNumber();
+      appState.current = {
+        number: appState.nextNumber || 1,
+        header: "",
+        revisionNumber: "1 RT-2026",
+        revisionText: "TRIMESTRAL",
+        systems: {},
+        entries: [],
+        notes: "",
+        editingId: null
+      };
+      saveState();
+      renderHome();
+      showScreen("homeScreen");
+      setStatus(els.homeStatus, `Informe ${deletedNumber} eliminado.`);
     }
 
     function reportHasPhotos(report) {
@@ -1899,6 +2063,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         header: appState.current.header,
         revisionNumber: appState.current.revisionNumber,
         revisionText: appState.current.revisionText,
+        notes: appState.current.notes || "",
         systems: collectCurrentSystems(),
         createdAt: new Date().toISOString()
       };
@@ -1935,6 +2100,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         if (!report.id) report.id = makeId();
         report.number = Number(report.number || 0);
         report.systems = Array.isArray(report.systems) ? report.systems : [];
+        report.notes = report.notes || "";
         byId.set(report.id, report);
       });
       appState.savedReports = [...byId.values()]
@@ -2001,15 +2167,14 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         header: report.header || "",
         revisionNumber: report.revisionNumber || "1 RT-2026",
         revisionText: report.revisionText || "TRIMESTRAL",
+        notes: report.notes || "",
         systems: systemsFromSavedReport(report),
         entries,
         editingId: report.id
       };
       appState.nextNumber = getNextReportNumber();
       saveState();
-      renderHome();
-      setStatus(els.homeStatus, `Informe ${report.number} abierto para rectificar y añadir sistemas.`);
-      showScreen("homeScreen");
+      showCurrentReportScreen(`Informe ${report.number} abierto para rectificar y añadir sistemas.`);
     }
 
     function clearCurrentReport() {
@@ -2024,6 +2189,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
             revisionText: "TRIMESTRAL",
             systems: {},
             entries: [],
+            notes: "",
             editingId: null
         };
         saveState();
@@ -2041,6 +2207,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         revisionText: "TRIMESTRAL",
         systems: {},
         entries: [],
+        notes: "",
         editingId: null
       };
       saveState();
@@ -2356,7 +2523,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       previewMode = "set";
       const report = makeCurrentReportSnapshot();
       if (!report.systems.length) {
-        setStatus(els.homeStatus, "No hay sistemas preparados para ver.", true);
+        setStatus(previewReturnScreen === "report" ? els.reportStatus : els.homeStatus, "No hay sistemas preparados para ver.", true);
         return;
       }
       els.mountedPreview.innerHTML = buildFullHtml(report);
@@ -2368,6 +2535,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     function saveCurrentEntry() {
       buildSystemReport(activeEntryId);
       saveState();
+      if (systemReturnScreen === "report") {
+        showCurrentReportScreen(`${activeSystem} grabado.`);
+        return;
+      }
       renderHome();
       setStatus(els.homeStatus, `${activeSystem} grabado.`);
       showScreen("homeScreen");
@@ -2384,6 +2555,32 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       renderHome();
       showScreen("homeScreen");
     });
+    document.getElementById("backFromReportBtn").addEventListener("click", () => {
+      renderHome();
+      showScreen("homeScreen");
+    });
+    document.getElementById("saveReportDetailBtn").addEventListener("click", saveReportDetail);
+    document.getElementById("viewReportDetailBtn").addEventListener("click", () => {
+      previewReturnScreen = "report";
+      viewCurrentSet();
+    });
+    document.getElementById("downloadReportDetailPdfBtn").addEventListener("click", async () => {
+      const report = makeCurrentReportSnapshot();
+      if (!report.systems.length) {
+        setStatus(els.reportStatus, "No hay sistemas para descargar.", true);
+        return;
+      }
+      await downloadPdfFromHtml(buildFullHtml(report), `informe-${appState.current.number}.pdf`);
+    });
+    document.getElementById("downloadReportDetailWordBtn").addEventListener("click", () => {
+      const report = makeCurrentReportSnapshot();
+      if (!report.systems.length) {
+        setStatus(els.reportStatus, "No hay sistemas para descargar.", true);
+        return;
+      }
+      downloadWord(buildFullHtml(report), `informe-${appState.current.number}.doc`);
+    });
+    document.getElementById("deleteReportDetailBtn").addEventListener("click", deleteCurrentSavedReport);
     document.getElementById("addListingRowBtn").addEventListener("click", addListingRow);
     document.getElementById("downloadListingBtn").addEventListener("click", downloadListingExcel);
     document.getElementById("deleteListingBtn").addEventListener("click", deleteListingExcel);
@@ -2401,13 +2598,20 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     document.getElementById("applyChatGptResultBtn").addEventListener("click", applyChatGptResult);
     document.getElementById("backFromSystemBtn").addEventListener("click", () => {
       saveSystemInputs();
-      renderHome();
-      showScreen("homeScreen");
+      if (systemReturnScreen === "report") {
+        showCurrentReportScreen();
+      } else {
+        renderHome();
+        showScreen("homeScreen");
+      }
     });
     document.getElementById("backFromPreviewBtn").addEventListener("click", () => {
       if (previewMode === "set") {
-        renderHome();
-        showScreen("homeScreen");
+        if (previewReturnScreen === "report") showCurrentReportScreen();
+        else {
+          renderHome();
+          showScreen("homeScreen");
+        }
       } else {
         renderEntry(activeEntryId);
       }
@@ -2416,6 +2620,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     document.getElementById("viewEntryBtn").addEventListener("click", viewCurrentEntry);
     document.getElementById("saveMountedBtn").addEventListener("click", () => {
       if (previewMode === "entry") saveCurrentEntry();
+      else if (previewReturnScreen === "report") saveReportDetail();
       else saveCurrentReport();
     });
     document.getElementById("downloadMountedWordBtn").addEventListener("click", () => {
@@ -2438,6 +2643,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
     document.getElementById("clearMountedBtn").addEventListener("click", clearCurrentReport);
     document.getElementById("downloadAllPdfBtn").addEventListener("click", async () => {
+      previewReturnScreen = "home";
       const report = makeAllReportsSnapshot();
       if (!report.systems.length) {
         setStatus(els.homeStatus, "No hay informes para descargar.", true);
@@ -2446,6 +2652,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       await downloadPdfFromHtml(buildFullHtml(report), "informes-sistemas.pdf");
     });
     document.getElementById("downloadAllWordBtn").addEventListener("click", () => {
+      previewReturnScreen = "home";
       const report = makeAllReportsSnapshot();
       if (!report.systems.length) {
         setStatus(els.homeStatus, "No hay informes para descargar.", true);
@@ -2475,6 +2682,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       saveState();
     });
 
+    els.reportNotes.addEventListener("input", () => {
+      appState.current.notes = els.reportNotes.value;
+      saveState();
+    });
+
     els.listingRows.addEventListener("input", event => {
       const input = event.target.closest("[data-listing-field]");
       if (!input) return;
@@ -2498,6 +2710,18 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     els.systemButtons.addEventListener("click", event => {
       const button = event.target.closest("[data-system]");
       if (button) {
+        systemReturnScreen = "home";
+        const entry = makeEntry(button.dataset.system);
+        appState.current.entries.push(entry);
+        activeEntryId = entry.id;
+        renderEntry(entry.id);
+      }
+    });
+
+    els.reportSystemButtons.addEventListener("click", event => {
+      const button = event.target.closest("[data-system]");
+      if (button) {
+        systemReturnScreen = "report";
         const entry = makeEntry(button.dataset.system);
         appState.current.entries.push(entry);
         activeEntryId = entry.id;
@@ -2508,6 +2732,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     els.preparedEntries.addEventListener("click", event => {
       const editButton = event.target.closest("[data-edit-entry]");
       if (editButton) {
+        systemReturnScreen = "home";
         renderEntry(editButton.dataset.editEntry);
         return;
       }
@@ -2517,6 +2742,22 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
         saveState();
         renderHome();
+      }
+    });
+
+    els.reportPreparedEntries.addEventListener("click", event => {
+      const editButton = event.target.closest("[data-edit-entry]");
+      if (editButton) {
+        systemReturnScreen = "report";
+        renderEntry(editButton.dataset.editEntry);
+        return;
+      }
+
+      const removeButton = event.target.closest("[data-remove-entry]");
+      if (removeButton) {
+        appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
+        saveState();
+        renderReportScreen();
       }
     });
 
@@ -2537,7 +2778,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
           appState.current = {
             number: appState.nextNumber || 1,
             header: "",
+            revisionNumber: "1 RT-2026",
+            revisionText: "TRIMESTRAL",
             systems: {},
+            entries: [],
+            notes: "",
             editingId: null
           };
         }

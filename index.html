@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#d7ff00">
+  <meta name="theme-color" content="#ffe600">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="SISTEMAS">
@@ -16,8 +16,8 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
-      --lime: #d7ff00;
-      --lime-strong: #a6d900;
+      --lime: #ffe600;
+      --lime-strong: #d6b900;
       --pink: #ff4fa3;
       --green: #22a447;
       --blue: #1266d6;
@@ -26,8 +26,8 @@
       --ink: #10140d;
       --muted: #5b6252;
       --paper: #fbfff0;
-      --panel: #f6ffc7;
-      --line: #cfff2e;
+      --panel: #fff7a8;
+      --line: #f0cc00;
       --white: #ffffff;
       --shadow: 0 18px 45px rgba(70, 110, 0, .16);
     }
@@ -40,8 +40,8 @@
       font-family: Arial, Helvetica, sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(215, 255, 0, .48), transparent 34rem),
-        linear-gradient(135deg, #fbffe9 0%, #ffffff 48%, #efffbf 100%);
+        radial-gradient(circle at top left, rgba(255, 230, 0, .55), transparent 34rem),
+        linear-gradient(135deg, #fff8b8 0%, #ffffff 48%, #fff27a 100%);
     }
 
     button, input, textarea { font: inherit; }
@@ -2852,7 +2852,9 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch(() => {});
+        navigator.serviceWorker.register("sw.js?v=15", { updateViaCache: "none" })
+          .then(registration => registration.update())
+          .catch(() => {});
       });
     }
 

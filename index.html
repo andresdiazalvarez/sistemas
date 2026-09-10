@@ -648,12 +648,20 @@
 
     <section id="homeScreen" class="screen active" aria-labelledby="homeTitle">
       <div class="panel">
-        <h2 id="homeTitle">Informes grabados</h2>
+        <div class="toolbar">
+          <h2 id="homeTitle">Informes grabados</h2>
+          <button id="newReportBtn" class="btn pink" type="button">Crear nuevo informe</button>
+        </div>
         <div id="savedReports" class="saved-list"></div>
       </div>
+    </section>
 
+    <section id="newReportScreen" class="screen" aria-labelledby="newReportTitle">
       <div class="panel">
-        <h2>Nuevo informe</h2>
+        <div class="toolbar">
+          <h2 id="newReportTitle">Nuevo informe</h2>
+          <button id="backFromNewReportBtn" class="btn" type="button">Volver</button>
+        </div>
         <div class="toolbar">
           <div class="button-row">
             <div id="currentReportNumber" class="report-number">Informe 1</div>
@@ -1003,13 +1011,14 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     let activeSystem = "";
     let activeEntryId = "";
     let previewMode = "entry";
-    let systemReturnScreen = "home";
-    let previewReturnScreen = "home";
+    let systemReturnScreen = "newReport";
+    let previewReturnScreen = "newReport";
     let activeRecognition = null;
     let deferredInstallPrompt = null;
 
     const els = {
       homeScreen: document.getElementById("homeScreen"),
+      newReportScreen: document.getElementById("newReportScreen"),
       listingScreen: document.getElementById("listingScreen"),
       reportScreen: document.getElementById("reportScreen"),
       systemScreen: document.getElementById("systemScreen"),
@@ -1259,7 +1268,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function showScreen(name, options = {}) {
-      [els.homeScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
+      [els.homeScreen, els.newReportScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
       document.getElementById(name).classList.add("active");
       if (!options.keepScroll) window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1996,7 +2005,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         appState.nextNumber = previousNextNumber;
         renderHome();
         setStatus(els.homeStatus, "No se pudo grabar el informe con las fotos. Reduce el tamaño o número de fotos.", true);
-        showScreen("homeScreen");
+        showScreen("newReportScreen");
         return;
       }
       renderHome();
@@ -2194,6 +2203,23 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       appState.nextNumber = getNextReportNumber();
       saveState();
       showCurrentReportScreen(`Informe ${report.number} abierto para rectificar y añadir sistemas.`);
+    }
+
+    function startNewReport() {
+      appState.nextNumber = getNextReportNumber();
+      appState.current = {
+        number: appState.nextNumber,
+        header: "",
+        revisionNumber: "1 RT-2026",
+        revisionText: "TRIMESTRAL",
+        systems: {},
+        entries: [],
+        notes: "",
+        editingId: null
+      };
+      saveState();
+      renderHome();
+      showScreen("newReportScreen");
     }
 
     function clearCurrentReport() {
@@ -2560,19 +2586,27 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
       renderHome();
       setStatus(els.homeStatus, `${activeSystem} grabado.`);
-      showScreen("homeScreen");
+      showScreen("newReportScreen");
     }
 
     document.getElementById("saveCurrentBtn").addEventListener("click", saveCurrentReport);
-    document.getElementById("viewAllBtn").addEventListener("click", viewCurrentSet);
+    document.getElementById("viewAllBtn").addEventListener("click", () => {
+      previewReturnScreen = "newReport";
+      viewCurrentSet();
+    });
     document.getElementById("deleteCurrentBtn").addEventListener("click", clearCurrentReport);
     document.getElementById("openListingBtn").addEventListener("click", () => {
       renderListing();
       showScreen("listingScreen");
     });
-    document.getElementById("backFromListingBtn").addEventListener("click", () => {
+    document.getElementById("newReportBtn").addEventListener("click", startNewReport);
+    document.getElementById("backFromNewReportBtn").addEventListener("click", () => {
       renderHome();
       showScreen("homeScreen");
+    });
+    document.getElementById("backFromListingBtn").addEventListener("click", () => {
+      renderHome();
+      showScreen("newReportScreen");
     });
     document.getElementById("backFromReportBtn").addEventListener("click", () => {
       renderHome();
@@ -2621,7 +2655,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         showCurrentReportScreen();
       } else {
         renderHome();
-        showScreen("homeScreen");
+        showScreen("newReportScreen");
       }
     });
     document.getElementById("backFromPreviewBtn").addEventListener("click", () => {
@@ -2629,7 +2663,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         if (previewReturnScreen === "report") showCurrentReportScreen();
         else {
           renderHome();
-          showScreen("homeScreen");
+          showScreen("newReportScreen");
         }
       } else {
         renderEntry(activeEntryId);
@@ -2662,7 +2696,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
     document.getElementById("clearMountedBtn").addEventListener("click", clearCurrentReport);
     document.getElementById("downloadAllPdfBtn").addEventListener("click", async () => {
-      previewReturnScreen = "home";
+      previewReturnScreen = "newReport";
       const report = makeAllReportsSnapshot();
       if (!report.systems.length) {
         setStatus(els.homeStatus, "No hay informes para descargar.", true);
@@ -2671,7 +2705,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       await downloadPdfFromHtml(buildFullHtml(report), "informes-sistemas.pdf");
     });
     document.getElementById("downloadAllWordBtn").addEventListener("click", () => {
-      previewReturnScreen = "home";
+      previewReturnScreen = "newReport";
       const report = makeAllReportsSnapshot();
       if (!report.systems.length) {
         setStatus(els.homeStatus, "No hay informes para descargar.", true);
@@ -2729,7 +2763,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     els.systemButtons.addEventListener("click", event => {
       const button = event.target.closest("[data-system]");
       if (button) {
-        systemReturnScreen = "home";
+        systemReturnScreen = "newReport";
         const entry = makeEntry(button.dataset.system);
         appState.current.entries.push(entry);
         activeEntryId = entry.id;
@@ -2751,7 +2785,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     els.preparedEntries.addEventListener("click", event => {
       const editButton = event.target.closest("[data-edit-entry]");
       if (editButton) {
-        systemReturnScreen = "home";
+        systemReturnScreen = "newReport";
         renderEntry(editButton.dataset.editEntry);
         return;
       }
@@ -2881,7 +2915,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=16", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=17", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
       });

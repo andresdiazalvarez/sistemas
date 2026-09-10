@@ -254,15 +254,25 @@
 
     .saved-item {
       display: grid;
-      grid-template-columns: minmax(120px, .35fr) minmax(160px, .45fr) minmax(180px, 1fr) auto;
+      grid-template-columns: minmax(130px, .3fr) minmax(190px, .55fr) auto;
       gap: 10px;
       align-items: center;
-      border: 1px solid var(--line);
+      border: 2px solid var(--lime-strong);
       border-radius: 8px;
       background: var(--panel);
-      padding: 12px;
+      padding: 14px;
       text-align: left;
       width: 100%;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+
+    .saved-item:hover,
+    .saved-item:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(80, 70, 0, .16);
+      outline: 3px solid rgba(255, 230, 0, .45);
+      outline-offset: 2px;
     }
 
     .saved-title {
@@ -279,6 +289,14 @@
       overflow-wrap: anywhere;
     }
 
+    .saved-header {
+      grid-column: 1 / -1;
+      padding-top: 10px;
+      border-top: 1px solid var(--lime-strong);
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
     .report-actions {
       margin: 14px 0 18px;
     }
@@ -289,12 +307,12 @@
 
     .delete-report-wide {
       width: 100%;
-      min-height: 76px;
-      margin-top: 22px;
+      min-height: 96px;
+      margin-top: 28px;
       background: var(--lime);
       border-color: var(--lime-strong);
       color: var(--red);
-      font-size: clamp(1.7rem, 4vw, 2.8rem);
+      font-size: clamp(2rem, 5vw, 3.4rem);
       font-weight: 900;
       line-height: 1;
     }
@@ -630,6 +648,12 @@
 
     <section id="homeScreen" class="screen active" aria-labelledby="homeTitle">
       <div class="panel">
+        <h2 id="homeTitle">Informes grabados</h2>
+        <div id="savedReports" class="saved-list"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Nuevo informe</h2>
         <div class="toolbar">
           <div class="button-row">
             <div id="currentReportNumber" class="report-number">Informe 1</div>
@@ -663,15 +687,10 @@
           <button id="openListingBtn" class="btn pink" type="button">LISTADO</button>
         </div>
 
-        <h2 id="homeTitle">Sistemas</h2>
+        <h2>Sistemas</h2>
         <div id="systemButtons" class="systems"></div>
         <div id="preparedEntries" class="prepared-list"></div>
         <div id="homeStatus" class="status" aria-live="polite"></div>
-      </div>
-
-      <div class="panel">
-        <h2>Informes grabados</h2>
-        <div id="savedReports" class="saved-list"></div>
       </div>
     </section>
 
@@ -716,12 +735,12 @@
         </div>
 
         <h2>Sistemas</h2>
-        <div id="reportSystemButtons" class="systems"></div>
-
-        <div class="field" style="margin-top: 16px;">
+        <div class="field">
           <label for="reportNotes">Datos del informe</label>
           <textarea id="reportNotes" class="report-notes" placeholder="Escribe aqui todos los datos que necesites guardar dentro de este informe"></textarea>
         </div>
+
+        <div id="reportSystemButtons" class="systems"></div>
 
         <div id="reportPreparedEntries" class="prepared-list"></div>
         <div id="reportStatus" class="status" aria-live="polite"></div>
@@ -1334,7 +1353,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
     function savedReportTitle(report) {
       const header = (report.header || "").trim().toUpperCase();
-      return header ? `Informe ${report.number} - ${header}` : `Informe ${report.number}`;
+      return `Informe ${report.number}`;
     }
 
     function currentReportTitle() {
@@ -1371,14 +1390,14 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       const reports = [...appState.savedReports].sort((a, b) => Number(a.number) - Number(b.number));
       els.savedReports.innerHTML = reports.length
         ? reports.map(report => `
-          <div class="saved-item" data-action="open" data-id="${report.id}">
+          <div class="saved-item" data-action="open" data-id="${report.id}" role="button" tabindex="0" aria-label="Abrir Informe ${report.number}">
             <div class="saved-title">${escapeHtml(savedReportTitle(report))}</div>
             <div class="saved-revision">Nº revisión: ${escapeHtml(report.revisionNumber || "1 RT-2026")}<br>Revisión: ${escapeHtml(report.revisionText || "TRIMESTRAL")}</div>
-            <div class="saved-meta">Cabecera: ${escapeHtml((report.header || "").toUpperCase() || "SIN CABECERA")}<br>${report.systems.length} sistema(s) grabado(s)</div>
             <div class="button-row">
               <button class="btn green" type="button" data-action="pdf" data-id="${report.id}">PDF</button>
               <button class="btn blue" type="button" data-action="word" data-id="${report.id}">Word</button>
             </div>
+            <div class="saved-header">Cabecera: ${escapeHtml((report.header || "").toUpperCase() || "SIN CABECERA")}<br><span class="saved-meta">${report.systems.length} sistema(s) grabado(s)</span></div>
           </div>
         `).join("")
         : '<div class="empty">Todavía no hay informes grabados.</div>';
@@ -2801,6 +2820,16 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
     });
 
+    els.savedReports.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.target.closest("button")) return;
+      const reportCard = event.target.closest('[data-action="open"]');
+      if (!reportCard) return;
+      event.preventDefault();
+      const report = getReport(reportCard.dataset.id);
+      if (report) openSavedReport(report);
+    });
+
     els.sectionContainer.addEventListener("input", saveSystemInputs);
     els.sectionContainer.addEventListener("click", event => {
       const button = event.target.closest("[data-dictate]");
@@ -2852,7 +2881,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=15", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=16", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
       });

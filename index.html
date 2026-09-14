@@ -1156,8 +1156,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
     function saveStateToLocalStorage() {
       try {
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(makeLocalStorageState(appState)));
+        const serialized = JSON.stringify(makeLocalStorageState(appState));
+        // setItem reemplaza el valor de forma atómica: si falla, conserva la copia anterior.
+        localStorage.setItem(STORAGE_KEY, serialized);
         return true;
       } catch (error) {
         const target = els.systemScreen.classList.contains("active")
@@ -1179,8 +1180,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     function stripHeavyReportData(state) {
       if (state.listing) state.listing.fileData = "";
       (state.current?.entries || []).forEach(entry => stripHeavyEntryData(entry));
+      Object.values(state.current?.systems || {}).forEach(entry => stripHeavyEntryData(entry));
       (state.savedReports || []).forEach(report => {
         (report.sourceEntries || []).forEach(entry => stripHeavyEntryData(entry));
+        Object.values(report.sourceSystems || {}).forEach(entry => stripHeavyEntryData(entry));
         (report.systems || []).forEach(system => {
           system.photos = [];
           system.html = "";
@@ -1224,6 +1227,16 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         tx.oncomplete = resolve;
         tx.onerror = resolve;
       });
+    }
+
+    async function requestPersistentStorage() {
+      try {
+        if (!navigator.storage?.persist) return false;
+        if (navigator.storage.persisted && await navigator.storage.persisted()) return true;
+        return await navigator.storage.persist();
+      } catch (error) {
+        return false;
+      }
     }
 
     async function restoreStateFromDb() {
@@ -1604,6 +1617,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function deleteListingExcel() {
+      if (!appState.listing?.rows?.length && !appState.listing?.fileData) return;
+      if (!window.confirm("¿Quieres eliminar completamente el listado cargado?")) return;
       appState.listing = emptyListing();
       saveState();
       renderListing();
@@ -2063,6 +2078,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     function deleteCurrentSavedReport() {
       if (!appState.current.editingId) return;
       const deletedNumber = appState.current.number;
+      if (!window.confirm(`¿Quieres eliminar definitivamente el Informe ${deletedNumber}?`)) return;
       appState.savedReports = appState.savedReports.filter(report => report.id !== appState.current.editingId);
       appState.nextNumber = getNextReportNumber();
       appState.current = {
@@ -2225,6 +2241,34 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     function startNewReport() {
+      const hasDraft = Boolean(
+        appState.current.header.trim()
+        || appState.current.notes.trim()
+        || appState.current.entries.length
+      );
+      if (!appState.current.editingId && hasDraft) {
+        renderHome();
+        showScreen("newReportScreen");
+        return;
+      }
+
+      if (appState.current.editingId) {
+        const existingIndex = appState.savedReports.findIndex(report => report.id === appState.current.editingId);
+        if (existingIndex >= 0) {
+          appState.savedReports[existingIndex] = {
+            ...appState.savedReports[existingIndex],
+            header: appState.current.header,
+            revisionNumber: appState.current.revisionNumber,
+            revisionText: appState.current.revisionText,
+            notes: appState.current.notes || "",
+            systems: collectCurrentSystems(),
+            sourceSystems: cloneData(appState.current.systems),
+            sourceEntries: cloneData(appState.current.entries),
+            updatedAt: new Date().toISOString()
+          };
+        }
+      }
+
       appState.nextNumber = getNextReportNumber();
       appState.current = {
         number: appState.nextNumber,
@@ -2242,6 +2286,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     function clearCurrentReport() {
+      const message = appState.current.editingId
+        ? `¿Quieres eliminar definitivamente el Informe ${appState.current.number} completo?`
+        : "¿Quieres borrar todos los datos del informe que estás preparando?";
+      if (!window.confirm(message)) return;
+
       if (appState.current.editingId) {
         const deleted = appState.savedReports.find(report => report.id === appState.current.editingId);
         appState.savedReports = appState.savedReports.filter(report => report.id !== appState.current.editingId);
@@ -2281,7 +2330,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     async function clearAppData() {
-      const ok = window.confirm("Esto borrara todos los informes y fotos guardados en SISTEMAS en este navegador. Si ya los has descargado, pulsa Aceptar.");
+      const ok = window.confirm("¿Quieres eliminar definitivamente TODOS los informes, sistemas, listados, textos y fotos guardados en SISTEMAS?");
       if (!ok) return;
       localStorage.removeItem(STORAGE_KEY);
       await clearStateFromDb();
@@ -2838,6 +2887,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
       const removeButton = event.target.closest("[data-remove-entry]");
       if (removeButton) {
+        const entry = appState.current.entries.find(item => item.id === removeButton.dataset.removeEntry);
+        if (!window.confirm(`¿Quieres quitar definitivamente ${entry?.type || "este sistema"} del informe?`)) return;
         appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
         saveState();
         renderHome();
@@ -2854,6 +2905,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
       const removeButton = event.target.closest("[data-remove-entry]");
       if (removeButton) {
+        const entry = appState.current.entries.find(item => item.id === removeButton.dataset.removeEntry);
+        if (!window.confirm(`¿Quieres quitar definitivamente ${entry?.type || "este sistema"} del informe?`)) return;
         appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
         saveState();
         renderReportScreen();
@@ -2872,6 +2925,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       if (!report) return;
 
       if (button.dataset.action === "delete") {
+        if (!window.confirm(`¿Quieres eliminar definitivamente el Informe ${report.number}?`)) return;
         appState.savedReports = appState.savedReports.filter(item => item.id !== report.id);
         if (appState.current.editingId === report.id) {
           appState.current = {
@@ -2923,6 +2977,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       const index = Number(input.dataset.photo);
       try {
         const previous = data.photos[index];
+        if (previous && !window.confirm(`La foto ${index + 1} ya existe. ¿Quieres sustituirla por la nueva?`)) {
+          input.value = "";
+          return;
+        }
         data.photos[index] = await compressImageFile(input.files[0]);
         data.mountedHtml = "";
         data.mountedText = "";
@@ -2941,7 +2999,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       const button = event.target.closest("[data-delete-photo]");
       if (!button) return;
       const data = ensureEntry(activeEntryId);
-      data.photos[Number(button.dataset.deletePhoto)] = null;
+      const index = Number(button.dataset.deletePhoto);
+      if (!data.photos[index]) return;
+      if (!window.confirm(`¿Quieres eliminar definitivamente la foto ${index + 1}?`)) return;
+      data.photos[index] = null;
       data.mountedHtml = "";
       data.mountedText = "";
       saveState();
@@ -2961,9 +3022,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=18", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=19", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
+        requestPersistentStorage();
       });
     }
 

@@ -288,6 +288,52 @@
       display: none !important;
     }
 
+    .word-text-screen .panel {
+      background: #071b36;
+      border-color: #1f5f99;
+      color: #f7fbff;
+      box-shadow: 0 18px 45px rgba(0, 18, 44, .28);
+    }
+
+    .word-text-screen .subhead,
+    .word-text-screen .status {
+      color: #c8ddf3;
+    }
+
+    .word-system-section {
+      padding: 24px 0;
+      border-top: 2px solid #2f79b8;
+    }
+
+    .word-system-section:first-child {
+      border-top: 0;
+      padding-top: 8px;
+    }
+
+    .word-system-section > h2 {
+      margin: 0 0 20px;
+      color: #ffeb3b;
+      text-transform: uppercase;
+      font-size: 1.35rem;
+    }
+
+    .word-point {
+      margin-bottom: 20px;
+    }
+
+    .word-point h3 {
+      margin: 0 0 7px;
+      color: #ffffff;
+      font-size: 1.05rem;
+    }
+
+    .word-point p {
+      margin: 0;
+      color: #dceaf7;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
     .saved-list {
       display: grid;
       gap: 10px;
@@ -904,6 +950,23 @@
       </div>
     </section>
 
+    <section id="wordTextScreen" class="screen word-text-screen" aria-labelledby="wordTextTitle">
+      <div class="panel">
+        <div class="toolbar">
+          <div>
+            <h2 id="wordTextTitle">Textos de los sistemas</h2>
+            <p class="subhead">Revisa los apartados antes de descargar el documento.</p>
+          </div>
+          <div class="button-row">
+            <button id="backFromWordTextBtn" class="btn" type="button">Volver</button>
+            <button id="downloadWordFromTextBtn" class="btn blue" type="button">Descargar ahora en Word</button>
+          </div>
+        </div>
+        <div id="wordTextContent"></div>
+        <div id="wordTextStatus" class="status" aria-live="polite"></div>
+      </div>
+    </section>
+
     <section id="previewScreen" class="screen" aria-labelledby="previewTitle">
       <div class="panel">
         <div class="toolbar">
@@ -1135,6 +1198,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       reportScreen: document.getElementById("reportScreen"),
       systemScreen: document.getElementById("systemScreen"),
       quickSystemScreen: document.getElementById("quickSystemScreen"),
+      wordTextScreen: document.getElementById("wordTextScreen"),
       previewScreen: document.getElementById("previewScreen"),
       currentReportNumber: document.getElementById("currentReportNumber"),
       reportHeader: document.getElementById("reportHeader"),
@@ -1164,6 +1228,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       quickSystemTitle: document.getElementById("quickSystemTitle"),
       quickSystemSubtitle: document.getElementById("quickSystemSubtitle"),
       quickSystemStatus: document.getElementById("quickSystemStatus"),
+      wordTextContent: document.getElementById("wordTextContent"),
+      wordTextStatus: document.getElementById("wordTextStatus"),
       photoContainer: document.getElementById("photoContainer"),
       metaClient: document.getElementById("metaClient"),
       metaBuilding: document.getElementById("metaBuilding"),
@@ -1399,7 +1465,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function showScreen(name, options = {}) {
-      [els.homeScreen, els.newReportScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.quickSystemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
+      [els.homeScreen, els.newReportScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.quickSystemScreen, els.wordTextScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
       document.getElementById(name).classList.add("active");
       if (!options.keepScroll) window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1847,6 +1913,46 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         data.checkNotes[label] = note?.value || "";
       });
       saveState();
+    }
+
+    function getSystemFixedText(system, section) {
+      return appState.fixedTexts?.[system]?.[section]
+        || DEFAULT_FIXED_TEXTS?.[system]?.[section]
+        || "";
+    }
+
+    function buildWordTextContent() {
+      return SYSTEMS.map(system => `
+        <section class="word-system-section">
+          <h2>${escapeHtml(system)}</h2>
+          ${SECTIONS.map(section => `
+            <div class="word-point">
+              <h3>${escapeHtml(section)}</h3>
+              <p>${escapeHtml(getSystemFixedText(system, section))}</p>
+            </div>
+          `).join("")}
+        </section>
+      `).join("");
+    }
+
+    function buildWordReferenceHtml() {
+      return `<div class="doc">${SYSTEMS.map(system => `
+        <section class="doc-part">
+          <div class="doc-system-title">${escapeHtml(system)}</div>
+          ${SECTIONS.map(section => `
+            <div class="doc-section">
+              <h3>${escapeHtml(section)}</h3>
+              <p>${escapeHtml(getSystemFixedText(system, section))}</p>
+            </div>
+          `).join("")}
+        </section>
+      `).join("")}</div>`;
+    }
+
+    function showWordTextScreen() {
+      els.wordTextContent.innerHTML = buildWordTextContent();
+      setStatus(els.wordTextStatus, "");
+      showScreen("wordTextScreen");
     }
 
     function saveSystemInputs() {
@@ -2889,12 +2995,14 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       await downloadPdfFromHtml(buildFullHtml(report), `informe-${appState.current.number}.pdf`);
     });
     document.getElementById("downloadReportDetailWordBtn").addEventListener("click", () => {
-      const report = makeCurrentReportSnapshot();
-      if (!report.systems.length) {
-        setStatus(els.reportStatus, "No hay sistemas para descargar.", true);
-        return;
-      }
-      downloadWord(buildFullHtml(report), `informe-${appState.current.number}.doc`);
+      showWordTextScreen();
+    });
+    document.getElementById("backFromWordTextBtn").addEventListener("click", () => {
+      showCurrentReportScreen();
+    });
+    document.getElementById("downloadWordFromTextBtn").addEventListener("click", () => {
+      downloadWord(buildWordReferenceHtml(), `textos-sistemas-informe-${appState.current.number}.doc`);
+      setStatus(els.wordTextStatus, "Documento Word descargado.");
     });
     document.getElementById("deleteReportDetailBtn").addEventListener("click", deleteCurrentSavedReport);
     document.getElementById("addListingRowBtn").addEventListener("click", addListingRow);
@@ -3202,7 +3310,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=24", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=25", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

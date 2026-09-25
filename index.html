@@ -683,7 +683,7 @@
           </div>
           <div class="button-row">
             <button id="downloadAllPdfBtn" class="btn green" type="button">Descargar todo en PDF</button>
-            <button id="downloadAllWordBtn" class="btn blue" type="button">Descargar todo en Word</button>
+            <button id="downloadAllWordBtn" class="btn blue" type="button">Ver informe</button>
             <button id="deleteCurrentBtn" class="btn red" type="button">Borrar informe actual</button>
           </div>
         </div>
@@ -2801,12 +2801,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
     document.getElementById("downloadAllWordBtn").addEventListener("click", () => {
       previewReturnScreen = "newReport";
-      const html = buildAllReportsHtml();
-      if (!html) {
-        setStatus(els.homeStatus, "No hay informes para descargar.", true);
-        return;
-      }
-      downloadWord(html, "informes-sistemas.doc");
+      viewCurrentSet();
     });
 
     els.reportHeader.addEventListener("input", () => {
@@ -3022,7 +3017,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=19", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=20", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

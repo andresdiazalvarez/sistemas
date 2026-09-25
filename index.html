@@ -841,21 +841,9 @@
           </div>
         </div>
 
-        <div class="section-block">
-          <div class="section-title">Casilleros de estado</div>
-          <div id="systemChecks" class="check-grid"></div>
-        </div>
+        <div id="sectionContainer"></div>
 
         <div class="section-block">
-          <div class="section-title">Textos del estado</div>
-          <div id="checkTextContainer" class="check-text-grid"></div>
-        </div>
-
-        <div class="hidden-support" aria-hidden="true">
-          <div id="sectionContainer"></div>
-        </div>
-
-        <div class="section-block hidden-support" aria-hidden="true">
           <div class="section-head">
             <div class="section-title">Modo seguro ChatGPT</div>
             <div class="button-row">
@@ -886,6 +874,33 @@
           <button id="viewEntryBtn" class="btn violet" type="button">Ver</button>
         </div>
         <div id="systemStatus" class="status" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section id="quickSystemScreen" class="screen" aria-labelledby="quickSystemTitle">
+      <div class="panel">
+        <div class="toolbar">
+          <div>
+            <h2 id="quickSystemTitle"></h2>
+            <p id="quickSystemSubtitle" class="subhead"></p>
+          </div>
+          <button id="backFromQuickSystemBtn" class="btn" type="button">Volver</button>
+        </div>
+
+        <div class="section-block">
+          <div class="section-title">Casilleros de estado</div>
+          <div id="systemChecks" class="check-grid"></div>
+        </div>
+
+        <div class="section-block">
+          <div class="section-title">Textos del estado</div>
+          <div id="checkTextContainer" class="check-text-grid"></div>
+        </div>
+
+        <div class="button-row" style="margin-top: 18px;">
+          <button id="saveQuickSystemBtn" class="btn green" type="button">Grabar</button>
+        </div>
+        <div id="quickSystemStatus" class="status" aria-live="polite"></div>
       </div>
     </section>
 
@@ -1119,6 +1134,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       listingScreen: document.getElementById("listingScreen"),
       reportScreen: document.getElementById("reportScreen"),
       systemScreen: document.getElementById("systemScreen"),
+      quickSystemScreen: document.getElementById("quickSystemScreen"),
       previewScreen: document.getElementById("previewScreen"),
       currentReportNumber: document.getElementById("currentReportNumber"),
       reportHeader: document.getElementById("reportHeader"),
@@ -1145,6 +1161,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       sectionContainer: document.getElementById("sectionContainer"),
       systemChecks: document.getElementById("systemChecks"),
       checkTextContainer: document.getElementById("checkTextContainer"),
+      quickSystemTitle: document.getElementById("quickSystemTitle"),
+      quickSystemSubtitle: document.getElementById("quickSystemSubtitle"),
+      quickSystemStatus: document.getElementById("quickSystemStatus"),
       photoContainer: document.getElementById("photoContainer"),
       metaClient: document.getElementById("metaClient"),
       metaBuilding: document.getElementById("metaBuilding"),
@@ -1380,7 +1399,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function showScreen(name, options = {}) {
-      [els.homeScreen, els.newReportScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
+      [els.homeScreen, els.newReportScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.quickSystemScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
       document.getElementById(name).classList.add("active");
       if (!options.keepScroll) window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1397,7 +1416,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         },
         sections: {},
         checks: {},
-        checkNotes: cloneData(DEFAULT_CHECK_NOTES),
+        checkNotes: {},
         photos: [],
         chatGptPrompt: "",
         chatGptResult: "",
@@ -1418,9 +1437,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         },
         sections: data.sections || {},
         checks: data.checks || {},
-        checkNotes: data.checkNotes && typeof data.checkNotes === "object"
-          ? data.checkNotes
-          : cloneData(DEFAULT_CHECK_NOTES),
+        checkNotes: data.checkNotes && typeof data.checkNotes === "object" ? data.checkNotes : {},
         photos: data.photos || [],
         chatGptPrompt: data.chatGptPrompt || "",
         chatGptResult: data.chatGptResult || "",
@@ -1449,11 +1466,6 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       target.chatGptResult = target.chatGptResult || "";
       target.checks = target.checks && typeof target.checks === "object" ? target.checks : {};
       target.checkNotes = target.checkNotes && typeof target.checkNotes === "object" ? target.checkNotes : {};
-      SYSTEM_CHECKS.forEach(label => {
-        if (!Object.prototype.hasOwnProperty.call(target.checkNotes, label)) {
-          target.checkNotes[label] = DEFAULT_CHECK_NOTES[label] || "";
-        }
-      });
       SECTIONS.forEach(section => {
         if (!target.sections[section]) target.sections[section] = emptySection();
         if (!appState.fixedTexts[target.type]) appState.fixedTexts[target.type] = {};
@@ -1752,18 +1764,6 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       els.metaDenomination.value = data.meta.denomination || data.type;
       els.chatGptPrompt.value = data.chatGptPrompt || "";
       els.chatGptResult.value = data.chatGptResult || "";
-      els.systemChecks.innerHTML = SYSTEM_CHECKS.map(label => `
-        <label class="check-option">
-          <input type="checkbox" data-system-check="${escapeHtml(label)}" ${data.checks[label] ? "checked" : ""}>
-          <span>${escapeHtml(label)}</span>
-        </label>
-      `).join("");
-      els.checkTextContainer.innerHTML = SYSTEM_CHECKS.map((label, index) => `
-        <div class="field">
-          <label>${index + 1}. ${escapeHtml(label.toUpperCase())}</label>
-          <textarea data-check-note="${escapeHtml(label)}" placeholder="Escribe aquí los datos de ${escapeHtml(label.toLowerCase())}">${escapeHtml(data.checkNotes[label] || "")}</textarea>
-        </div>
-      `).join("");
       els.sectionContainer.innerHTML = SECTIONS.map(section => {
         const value = data.sections[section];
         return `
@@ -1808,6 +1808,47 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       saveState();
     }
 
+    function renderQuickEntry(entryId) {
+      activeEntryId = entryId;
+      const data = ensureEntry(entryId);
+      activeSystem = data.type;
+      SYSTEM_CHECKS.forEach(label => {
+        if (!Object.prototype.hasOwnProperty.call(data.checkNotes, label)) {
+          data.checkNotes[label] = DEFAULT_CHECK_NOTES[label] || "";
+        }
+      });
+
+      els.quickSystemTitle.textContent = data.type;
+      els.quickSystemSubtitle.textContent = `Informe ${appState.current.number}`;
+      els.systemChecks.innerHTML = SYSTEM_CHECKS.map(label => `
+        <label class="check-option">
+          <input type="checkbox" data-system-check="${escapeHtml(label)}" ${data.checks[label] ? "checked" : ""}>
+          <span>${escapeHtml(label)}</span>
+        </label>
+      `).join("");
+      els.checkTextContainer.innerHTML = SYSTEM_CHECKS.map((label, index) => `
+        <div class="field">
+          <label>${index + 1}. ${escapeHtml(label.toUpperCase())}</label>
+          <textarea data-check-note="${escapeHtml(label)}" placeholder="Escribe aquí los datos de ${escapeHtml(label.toLowerCase())}">${escapeHtml(data.checkNotes[label] || "")}</textarea>
+        </div>
+      `).join("");
+      setStatus(els.quickSystemStatus, "");
+      saveState();
+      showScreen("quickSystemScreen");
+    }
+
+    function saveQuickInputs() {
+      if (!activeEntryId) return;
+      const data = ensureEntry(activeEntryId);
+      SYSTEM_CHECKS.forEach(label => {
+        const checkbox = els.systemChecks.querySelector(`[data-system-check="${CSS.escape(label)}"]`);
+        const note = els.checkTextContainer.querySelector(`[data-check-note="${CSS.escape(label)}"]`);
+        data.checks[label] = Boolean(checkbox?.checked);
+        data.checkNotes[label] = note?.value || "";
+      });
+      saveState();
+    }
+
     function saveSystemInputs() {
       if (!activeEntryId) return;
       const data = ensureEntry(activeEntryId);
@@ -1824,12 +1865,6 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       document.querySelectorAll("[data-voice]").forEach(textarea => {
         const section = textarea.dataset.voice;
         data.sections[section].voice = textarea.value;
-      });
-      SYSTEM_CHECKS.forEach(label => {
-        const checkbox = els.systemChecks.querySelector(`[data-system-check="${CSS.escape(label)}"]`);
-        data.checks[label] = Boolean(checkbox?.checked);
-        const note = els.checkTextContainer.querySelector(`[data-check-note="${CSS.escape(label)}"]`);
-        data.checkNotes[label] = note?.value || "";
       });
       data.chatGptPrompt = els.chatGptPrompt.value;
       data.chatGptResult = els.chatGptResult.value;
@@ -1917,7 +1952,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         ? `<div class="doc-section"><h3>Estado marcado</h3><p>${escapeHtml(selectedChecks.join(", "))}.</p></div>`
         : "";
       const checkNotesHtml = SYSTEM_CHECKS
-        .filter(label => (data.checkNotes?.[label] || "").trim())
+        .filter(label => data.checks?.[label] && (data.checkNotes?.[label] || "").trim())
         .map(label => `<div class="doc-section"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(data.checkNotes[label].trim())}</p></div>`)
         .join("");
       const sectionHtml = SECTIONS.map(section => {
@@ -1949,7 +1984,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         ...(selectedChecks.length ? ["Estado marcado", selectedChecks.join(", ")] : []),
         ...SYSTEM_CHECKS.flatMap(label => {
           const note = (data.checkNotes?.[label] || "").trim();
-          return note ? [label, note] : [];
+          return data.checks?.[label] && note ? [label, note] : [];
         }),
         ...SECTIONS.flatMap(section => {
           const item = data.sections?.[section] || emptySection();
@@ -2886,6 +2921,14 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         showScreen("newReportScreen");
       }
     });
+    document.getElementById("backFromQuickSystemBtn").addEventListener("click", () => {
+      saveQuickInputs();
+      showCurrentReportScreen("Selecciona otro sistema amarillo o vuelve al informe.");
+    });
+    document.getElementById("saveQuickSystemBtn").addEventListener("click", () => {
+      saveQuickInputs();
+      setStatus(els.quickSystemStatus, `${activeSystem} grabado.`);
+    });
     document.getElementById("backFromPreviewBtn").addEventListener("click", () => {
       if (previewMode === "set") {
         if (previewReturnScreen === "report") showCurrentReportScreen();
@@ -2996,11 +3039,15 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     els.reportSystemButtons.addEventListener("click", event => {
       const button = event.target.closest("[data-system]");
       if (button) {
-        systemReturnScreen = "report";
         const entry = makeEntry(button.dataset.system);
         appState.current.entries.push(entry);
         activeEntryId = entry.id;
-        renderEntry(entry.id);
+        if (reportReturnScreen === "newReportScreen") {
+          renderQuickEntry(entry.id);
+        } else {
+          systemReturnScreen = "report";
+          renderEntry(entry.id);
+        }
       }
     });
 
@@ -3025,8 +3072,12 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     els.reportPreparedEntries.addEventListener("click", event => {
       const editButton = event.target.closest("[data-edit-entry]");
       if (editButton) {
-        systemReturnScreen = "report";
-        renderEntry(editButton.dataset.editEntry);
+        if (reportReturnScreen === "newReportScreen") {
+          renderQuickEntry(editButton.dataset.editEntry);
+        } else {
+          systemReturnScreen = "report";
+          renderEntry(editButton.dataset.editEntry);
+        }
         return;
       }
 
@@ -3092,8 +3143,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
 
     els.sectionContainer.addEventListener("input", saveSystemInputs);
-    els.systemChecks.addEventListener("change", saveSystemInputs);
-    els.checkTextContainer.addEventListener("input", saveSystemInputs);
+    els.systemChecks.addEventListener("change", saveQuickInputs);
+    els.checkTextContainer.addEventListener("input", saveQuickInputs);
     els.sectionContainer.addEventListener("click", event => {
       const button = event.target.closest("[data-dictate]");
       if (button) startDictation(button.dataset.dictate);
@@ -3151,7 +3202,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=23", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=24", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

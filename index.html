@@ -247,6 +247,33 @@
       margin-bottom: 16px;
     }
 
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .check-option {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 44px;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--white);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .check-option input {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      accent-color: var(--green);
+      flex: 0 0 auto;
+    }
+
     .saved-list {
       display: grid;
       gap: 10px;
@@ -631,7 +658,7 @@
       .systems, .photos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .systems .btn.system-monoxide { grid-column: auto; }
       .saved-item { grid-template-columns: 1fr; }
-      .two-fields, .short-fields, .meta-grid { grid-template-columns: 1fr; }
+      .two-fields, .short-fields, .meta-grid, .check-grid { grid-template-columns: 1fr; }
       .prepared-item { grid-template-columns: 1fr; }
       .toolbar { align-items: flex-start; flex-direction: column; }
     }
@@ -800,6 +827,11 @@
           </div>
         </div>
 
+        <div class="section-block">
+          <div class="section-title">Casilleros de estado</div>
+          <div id="systemChecks" class="check-grid"></div>
+        </div>
+
         <div id="sectionContainer"></div>
 
         <div class="section-block">
@@ -875,6 +907,21 @@
       "3. Estado",
       "4. Normativa relacionada",
       "5. Conclusión"
+    ];
+
+    const SYSTEM_CHECKS = [
+      "Funcionando",
+      "Con averías",
+      "Baterías",
+      "Alarmas",
+      "Mal estado",
+      "Cableado",
+      "Solo pulsadores",
+      "No hay pulsadores",
+      "No hay sirenas",
+      "Placa base",
+      "Botoneras",
+      "Panel"
     ];
 
     const STORAGE_KEY = "sistemas.informes.v2";
@@ -1026,6 +1073,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     let previewMode = "entry";
     let systemReturnScreen = "newReport";
     let previewReturnScreen = "newReport";
+    let reportReturnScreen = "homeScreen";
     let activeRecognition = null;
     let deferredInstallPrompt = null;
 
@@ -1059,6 +1107,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       systemTitle: document.getElementById("systemTitle"),
       systemSubtitle: document.getElementById("systemSubtitle"),
       sectionContainer: document.getElementById("sectionContainer"),
+      systemChecks: document.getElementById("systemChecks"),
       photoContainer: document.getElementById("photoContainer"),
       metaClient: document.getElementById("metaClient"),
       metaBuilding: document.getElementById("metaBuilding"),
@@ -1310,6 +1359,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
           denomination: system
         },
         sections: {},
+        checks: {},
         photos: [],
         chatGptPrompt: "",
         chatGptResult: "",
@@ -1329,6 +1379,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
           denomination: system
         },
         sections: data.sections || {},
+        checks: data.checks || {},
         photos: data.photos || [],
         chatGptPrompt: data.chatGptPrompt || "",
         chatGptResult: data.chatGptResult || "",
@@ -1355,6 +1406,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       }
       target.chatGptPrompt = target.chatGptPrompt || "";
       target.chatGptResult = target.chatGptResult || "";
+      target.checks = target.checks && typeof target.checks === "object" ? target.checks : {};
       SECTIONS.forEach(section => {
         if (!target.sections[section]) target.sections[section] = emptySection();
         if (!appState.fixedTexts[target.type]) appState.fixedTexts[target.type] = {};
@@ -1467,7 +1519,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       setStatus(els.reportStatus, "");
     }
 
-    function showCurrentReportScreen(message = "") {
+    function showCurrentReportScreen(message = "", returnScreen = "") {
+      if (returnScreen) reportReturnScreen = returnScreen;
       renderReportScreen();
       if (message) setStatus(els.reportStatus, message);
       showScreen("reportScreen");
@@ -1652,6 +1705,12 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       els.metaDenomination.value = data.meta.denomination || data.type;
       els.chatGptPrompt.value = data.chatGptPrompt || "";
       els.chatGptResult.value = data.chatGptResult || "";
+      els.systemChecks.innerHTML = SYSTEM_CHECKS.map(label => `
+        <label class="check-option">
+          <input type="checkbox" data-system-check="${escapeHtml(label)}" ${data.checks[label] ? "checked" : ""}>
+          <span>${escapeHtml(label)}</span>
+        </label>
+      `).join("");
       els.sectionContainer.innerHTML = SECTIONS.map(section => {
         const value = data.sections[section];
         return `
@@ -1712,6 +1771,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       document.querySelectorAll("[data-voice]").forEach(textarea => {
         const section = textarea.dataset.voice;
         data.sections[section].voice = textarea.value;
+      });
+      SYSTEM_CHECKS.forEach(label => {
+        const checkbox = els.systemChecks.querySelector(`[data-system-check="${CSS.escape(label)}"]`);
+        data.checks[label] = Boolean(checkbox?.checked);
       });
       data.chatGptPrompt = els.chatGptPrompt.value;
       data.chatGptResult = els.chatGptResult.value;
@@ -1794,6 +1857,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function composeEntryReport(data) {
+      const selectedChecks = SYSTEM_CHECKS.filter(label => data.checks?.[label]);
+      const checksHtml = selectedChecks.length
+        ? `<div class="doc-section"><h3>Estado marcado</h3><p>${escapeHtml(selectedChecks.join(", "))}.</p></div>`
+        : "";
       const sectionHtml = SECTIONS.map(section => {
         const item = data.sections?.[section] || emptySection();
         const fixed = item.fixed.trim();
@@ -1811,6 +1878,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       const html = `
         <section class="doc-part">
           <div class="doc-system-title">${systemHeading}</div>
+          ${checksHtml}
           ${sectionHtml}
           ${photoHtml}
         </section>
@@ -1818,6 +1886,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
       const text = [
         data.type,
+        ...(selectedChecks.length ? ["Estado marcado", selectedChecks.join(", ")] : []),
         ...SECTIONS.flatMap(section => {
           const item = data.sections?.[section] || emptySection();
           return [
@@ -2237,7 +2306,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       };
       appState.nextNumber = getNextReportNumber();
       saveState();
-      showCurrentReportScreen(`Informe ${report.number} abierto para rectificar y añadir sistemas.`);
+      showCurrentReportScreen(`Informe ${report.number} abierto para rectificar y añadir sistemas.`, "homeScreen");
     }
 
     function startNewReport() {
@@ -2705,7 +2774,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
     document.getElementById("backFromReportBtn").addEventListener("click", () => {
       renderHome();
-      showScreen("homeScreen");
+      showScreen(reportReturnScreen);
     });
     document.getElementById("saveReportDetailBtn").addEventListener("click", saveReportDetail);
     document.getElementById("viewReportDetailBtn").addEventListener("click", () => {
@@ -2800,8 +2869,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       await downloadPdfFromHtml(html, "informes-sistemas.pdf");
     });
     document.getElementById("downloadAllWordBtn").addEventListener("click", () => {
-      previewReturnScreen = "newReport";
-      viewCurrentSet();
+      showCurrentReportScreen("Selecciona un sistema amarillo para escribir o modificar sus textos redactados por voz.", "newReportScreen");
     });
 
     els.reportHeader.addEventListener("input", () => {
@@ -2960,6 +3028,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
 
     els.sectionContainer.addEventListener("input", saveSystemInputs);
+    els.systemChecks.addEventListener("change", saveSystemInputs);
     els.sectionContainer.addEventListener("click", event => {
       const button = event.target.closest("[data-dictate]");
       if (button) startDictation(button.dataset.dictate);
@@ -3017,7 +3086,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=20", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=22", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

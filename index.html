@@ -274,6 +274,20 @@
       flex: 0 0 auto;
     }
 
+    .check-text-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .check-text-grid textarea {
+      min-height: 105px;
+    }
+
+    .hidden-support {
+      display: none !important;
+    }
+
     .saved-list {
       display: grid;
       gap: 10px;
@@ -658,7 +672,7 @@
       .systems, .photos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .systems .btn.system-monoxide { grid-column: auto; }
       .saved-item { grid-template-columns: 1fr; }
-      .two-fields, .short-fields, .meta-grid, .check-grid { grid-template-columns: 1fr; }
+      .two-fields, .short-fields, .meta-grid, .check-grid, .check-text-grid { grid-template-columns: 1fr; }
       .prepared-item { grid-template-columns: 1fr; }
       .toolbar { align-items: flex-start; flex-direction: column; }
     }
@@ -832,9 +846,16 @@
           <div id="systemChecks" class="check-grid"></div>
         </div>
 
-        <div id="sectionContainer"></div>
-
         <div class="section-block">
+          <div class="section-title">Textos del estado</div>
+          <div id="checkTextContainer" class="check-text-grid"></div>
+        </div>
+
+        <div class="hidden-support" aria-hidden="true">
+          <div id="sectionContainer"></div>
+        </div>
+
+        <div class="section-block hidden-support" aria-hidden="true">
           <div class="section-head">
             <div class="section-title">Modo seguro ChatGPT</div>
             <div class="button-row">
@@ -923,6 +944,21 @@
       "Botoneras",
       "Panel"
     ];
+
+    const DEFAULT_CHECK_NOTES = {
+      "Funcionando": `Durante la revisión se ha comprobado que la central se encuentra en funcionamiento. El equipo permanece alimentado y presenta indicación normal en el momento de la comprobación. Se han revisado los mandos e indicadores disponibles, verificándose su respuesta durante las maniobras realizadas.`,
+      "Con averías": `La central presenta avisos de avería activos durante la revisión. Las incidencias quedan reflejadas en la pantalla, pilotos o indicadores del equipo. Se identifican los mensajes mostrados por la central y los elementos asociados a dichos avisos.`,
+      "Baterías": `El equipo presenta aviso relacionado con las baterías o con la ausencia de estas en la central. Se comprueba la existencia, estado y conexión de las baterías cuando el equipo dispone de ellas. La incidencia aparece indicada mediante la pantalla, pilotos o señalización de la central.`,
+      "Alarmas": `Se han detectado avisos de alarma en la central durante la revisión. Los eventos quedan reflejados en la pantalla o en los indicadores del equipo. Se ha procedido a su localización, no encontrándose ningún elemento activado, por lo que es preciso un proceso correctivo para localizar el problema que afecta a dicho sistema.`,
+      "Mal estado": `El equipo presenta un estado general deficiente. Se observan elementos deteriorados, con suciedad, desgaste, golpes, falta de identificación o ausencia de conservación. La instalación requiere una revisión detallada de los componentes que presentan estas deficiencias.`,
+      "Cableado": `El cableado de la instalación presenta una disposición inadecuada. Se observan conductores con defectos en canalización, sueltos o con conexiones no ordenadas. Existen tramos de cableado que no mantienen una disposición uniforme o que presentan elementos sin una correcta protección. Se hace preciso confirmar que el cableado cumpla con la normativa vigente.`,
+      "Solo pulsadores": `La instalación dispone únicamente de pulsadores manuales de alarma. No se observan detectores automáticos u otros elementos de detección asociados a la central revisada. Solo los pulsadores existentes se pueden identificar como los únicos elementos de activación manual de la instalación.`,
+      "No hay pulsadores": `No se observa la existencia de pulsadores manuales de alarma en la instalación revisada. La central no dispone de estos elementos conectados o no se identifican en las zonas inspeccionadas. Se observa la ausencia de pulsadores manuales durante la revisión efectuada.`,
+      "No hay sirenas": `No se observa la existencia de sirenas o dispositivos acústicos de alarma en la instalación revisada. No se identifican elementos de aviso sonoro asociados a la central. Se observa la ausencia de estos dispositivos en las zonas comprobadas.`,
+      "Placa base": `La placa base de la central presenta incidencia o aviso de avería. El equipo refleja la anomalía mediante sus indicadores, pantalla o señalización disponible. Se observa que la central mantiene el mensaje correspondiente durante la revisión.`,
+      "Botoneras": `Las botoneras de control presentan deficiencias de funcionamiento o conservación. Se observan mandos deteriorados, sin respuesta, con identificación deficiente o con dificultad para realizar las maniobras.`,
+      "Panel": `El panel de la central presenta deficiencias de estado o funcionamiento. Se observan avisos, indicadores, mandos o elementos de visualización con incidencia. La central no actúa ni maniobra al comandarla desde su pantalla o teclado. Se observa la falta de respuesta durante las comprobaciones realizadas.`
+    };
 
     const STORAGE_KEY = "sistemas.informes.v2";
     const DB_NAME = "sistemas-informes-db";
@@ -1108,6 +1144,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       systemSubtitle: document.getElementById("systemSubtitle"),
       sectionContainer: document.getElementById("sectionContainer"),
       systemChecks: document.getElementById("systemChecks"),
+      checkTextContainer: document.getElementById("checkTextContainer"),
       photoContainer: document.getElementById("photoContainer"),
       metaClient: document.getElementById("metaClient"),
       metaBuilding: document.getElementById("metaBuilding"),
@@ -1360,6 +1397,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         },
         sections: {},
         checks: {},
+        checkNotes: cloneData(DEFAULT_CHECK_NOTES),
         photos: [],
         chatGptPrompt: "",
         chatGptResult: "",
@@ -1380,6 +1418,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         },
         sections: data.sections || {},
         checks: data.checks || {},
+        checkNotes: data.checkNotes && typeof data.checkNotes === "object"
+          ? data.checkNotes
+          : cloneData(DEFAULT_CHECK_NOTES),
         photos: data.photos || [],
         chatGptPrompt: data.chatGptPrompt || "",
         chatGptResult: data.chatGptResult || "",
@@ -1407,6 +1448,12 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       target.chatGptPrompt = target.chatGptPrompt || "";
       target.chatGptResult = target.chatGptResult || "";
       target.checks = target.checks && typeof target.checks === "object" ? target.checks : {};
+      target.checkNotes = target.checkNotes && typeof target.checkNotes === "object" ? target.checkNotes : {};
+      SYSTEM_CHECKS.forEach(label => {
+        if (!Object.prototype.hasOwnProperty.call(target.checkNotes, label)) {
+          target.checkNotes[label] = DEFAULT_CHECK_NOTES[label] || "";
+        }
+      });
       SECTIONS.forEach(section => {
         if (!target.sections[section]) target.sections[section] = emptySection();
         if (!appState.fixedTexts[target.type]) appState.fixedTexts[target.type] = {};
@@ -1711,6 +1758,12 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
           <span>${escapeHtml(label)}</span>
         </label>
       `).join("");
+      els.checkTextContainer.innerHTML = SYSTEM_CHECKS.map((label, index) => `
+        <div class="field">
+          <label>${index + 1}. ${escapeHtml(label.toUpperCase())}</label>
+          <textarea data-check-note="${escapeHtml(label)}" placeholder="Escribe aquí los datos de ${escapeHtml(label.toLowerCase())}">${escapeHtml(data.checkNotes[label] || "")}</textarea>
+        </div>
+      `).join("");
       els.sectionContainer.innerHTML = SECTIONS.map(section => {
         const value = data.sections[section];
         return `
@@ -1775,6 +1828,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       SYSTEM_CHECKS.forEach(label => {
         const checkbox = els.systemChecks.querySelector(`[data-system-check="${CSS.escape(label)}"]`);
         data.checks[label] = Boolean(checkbox?.checked);
+        const note = els.checkTextContainer.querySelector(`[data-check-note="${CSS.escape(label)}"]`);
+        data.checkNotes[label] = note?.value || "";
       });
       data.chatGptPrompt = els.chatGptPrompt.value;
       data.chatGptResult = els.chatGptResult.value;
@@ -1861,6 +1916,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       const checksHtml = selectedChecks.length
         ? `<div class="doc-section"><h3>Estado marcado</h3><p>${escapeHtml(selectedChecks.join(", "))}.</p></div>`
         : "";
+      const checkNotesHtml = SYSTEM_CHECKS
+        .filter(label => (data.checkNotes?.[label] || "").trim())
+        .map(label => `<div class="doc-section"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(data.checkNotes[label].trim())}</p></div>`)
+        .join("");
       const sectionHtml = SECTIONS.map(section => {
         const item = data.sections?.[section] || emptySection();
         const fixed = item.fixed.trim();
@@ -1879,6 +1938,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         <section class="doc-part">
           <div class="doc-system-title">${systemHeading}</div>
           ${checksHtml}
+          ${checkNotesHtml}
           ${sectionHtml}
           ${photoHtml}
         </section>
@@ -1887,6 +1947,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       const text = [
         data.type,
         ...(selectedChecks.length ? ["Estado marcado", selectedChecks.join(", ")] : []),
+        ...SYSTEM_CHECKS.flatMap(label => {
+          const note = (data.checkNotes?.[label] || "").trim();
+          return note ? [label, note] : [];
+        }),
         ...SECTIONS.flatMap(section => {
           const item = data.sections?.[section] || emptySection();
           return [
@@ -3029,6 +3093,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     els.sectionContainer.addEventListener("input", saveSystemInputs);
     els.systemChecks.addEventListener("change", saveSystemInputs);
+    els.checkTextContainer.addEventListener("input", saveSystemInputs);
     els.sectionContainer.addEventListener("click", event => {
       const button = event.target.closest("[data-dictate]");
       if (button) startDictation(button.dataset.dictate);
@@ -3086,7 +3151,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=22", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=23", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

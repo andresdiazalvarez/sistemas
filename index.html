@@ -584,6 +584,26 @@
       line-height: 1.35;
     }
 
+    .doc .reviewed-equipment {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 2px solid #555;
+    }
+
+    .doc .reviewed-equipment-title {
+      margin: 0 0 12px;
+      font-size: 12pt;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .doc .reviewed-list-title {
+      margin: 24px 0 8px;
+      font-size: 12pt;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
     .doc .doc-revision-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -839,7 +859,7 @@
           <button id="saveReportDetailBtn" class="btn pink" type="button">Grabar</button>
           <button id="viewReportDetailBtn" class="btn violet" type="button">Ver conjunto</button>
           <button id="downloadReportDetailPdfBtn" class="btn green" type="button">Descargar PDF</button>
-          <button id="downloadReportDetailWordBtn" class="btn blue" type="button">Descargar Word</button>
+          <button id="downloadReportDetailWordBtn" class="btn blue" type="button">Cabeceras</button>
         </div>
 
         <h2>Sistemas</h2>
@@ -1023,6 +1043,9 @@
       "Panel"
     ];
 
+    const COMMON_STATE_FIXED_TEXT = "El sistema queda descrito conforme al estado observado.";
+    const FIXED_TEXT_REVISION = 2;
+
     const DEFAULT_CHECK_NOTES = {
       "Funcionando": `Durante la revisión se ha comprobado que la central se encuentra en funcionamiento. El equipo permanece alimentado y presenta indicación normal en el momento de la comprobación. Se han revisado los mandos e indicadores disponibles, verificándose su respuesta durante las maniobras realizadas.`,
       "Con averías": `La central presenta avisos de avería activos durante la revisión. Las incidencias quedan reflejadas en la pantalla, pilotos o indicadores del equipo. Se identifican los mensajes mostrados por la central y los elementos asociados a dichos avisos.`,
@@ -1046,7 +1069,7 @@
       [SYSTEMS[0]]: {
         [SECTIONS[0]]: `Durante la visita de mantenimiento/inspección se comprueba la central principal de detección de incendios instalada en la dependencia indicada. El informe recoge exclusivamente el estado observado en el momento de la revisión, identificando la información visible en pantalla, pilotos, alimentación, baterías, zonas/lazos y elementos asociados cuando sea posible. Cuando no exista listado de zonas o documentación disponible, se dejará constancia expresa de que no se puede determinar la correspondencia exacta entre zona/lazo y ubicación protegida.`,
         [SECTIONS[1]]: `Se realiza comprobación visual y funcional de la central, revisando el estado general del equipo, señalización luminosa, indicaciones de pantalla, estado de avería/alarma/desconexión/prueba, alimentación, baterías y, cuando procede, comunicación con zonas, lazos, sirenas, pulsadores, detectores o módulos. Se verifican las incidencias que aparecen registradas por la propia central sin modificar la configuración ni alterar la instalación fuera del alcance de mantenimiento indicado.`,
-        [SECTIONS[2]]: `La central queda descrita conforme al estado observado.`,
+        [SECTIONS[2]]: COMMON_STATE_FIXED_TEXT,
         [SECTIONS[3]]: `A efectos de encuadre técnico, el sistema se analiza dentro del Reglamento de Instalaciones de Protección Contra Incendios, Real Decreto 513/2017, y de la familia UNE 23007 aplicable a sistemas de detección y alarma de incendios, especialmente en lo relativo a planificación, instalación, puesta en servicio, uso y mantenimiento. En edificios no industriales puede resultar aplicable el CTE DB-SI; en establecimientos industriales, el RSCIEI vigente.
 
 Real Decreto 513/2017, RIPCI: Reglamento principal aplicable a las instalaciones de protección contra incendios, incluyendo los sistemas de detección y alarma de incendios.
@@ -1066,7 +1089,7 @@ Las incidencias reflejadas corresponden a las señales y estados indicados por l
       [SYSTEMS[1]]: {
         [SECTIONS[0]]: `Durante la revisión se comprueba la central de extinción asociada al sistema automático/manual de extinción del recinto indicado. El informe refleja el estado de la central, su modo de funcionamiento, señales de disparo, prealarma, alarma, avería, anulación, presostatos, pulsadores de paro/disparo, sirenas, carteles luminosos y relación con la central de detección cuando exista.`,
         [SECTIONS[1]]: `Se comprueba el estado de la central, pilotos, display, modo de funcionamiento, alimentación, baterías, líneas de detección asociadas al disparo, dispositivos manuales de paro y disparo, señalización acústica/luminosa, estado de botellas, presostatos y circuitos supervisados cuando el sistema lo permita. Las comprobaciones se documentan según el estado observado y sin efectuar descargas reales del agente extintor salvo indicación expresa y procedimiento específico.`,
-        [SECTIONS[2]]: `La central queda descrita conforme al estado observado.`,
+        [SECTIONS[2]]: COMMON_STATE_FIXED_TEXT,
         [SECTIONS[3]]: `El informe puede encuadrarse en el Real Decreto 513/2017 RIPCI para instalaciones de protección contra incendios y, según el tipo de sistema, en normas UNE/EN aplicables a sistemas fijos de extinción automática, sistemas de detección asociados, dispositivos de disparo, señalización y componentes del sistema. Cuando el recinto pertenezca a edificio industrial se considerará además el RSCIEI vigente; para otros edificios, el CTE DB-SI cuando corresponda.
 
 Real Decreto 513/2017, RIPCI: Reglamento principal aplicable a las instalaciones de protección contra incendios, incluyendo los sistemas fijos de extinción y sus centrales de control.
@@ -1088,7 +1111,7 @@ Las incidencias recogidas en el informe corresponden al estado mostrado por la c
       [SYSTEMS[2]]: {
         [SECTIONS[0]]: `Se revisa el sistema de extinción instalado en la dependencia indicada, describiendo el tipo de protección existente: rociadores, extinción por gas, espuma, agua nebulizada, extinción en campana, sistema manual o sistema automático.`,
         [SECTIONS[1]]: `Se comprueban visualmente los componentes accesibles del sistema, incluyendo estado de tuberías, boquillas, rociadores, válvulas, manómetros, presostatos, botellas, soportes, señalización, mandos manuales y relación con central de detección/extinción. En sistemas por agente gaseoso se revisan botellas, latiguillos, colectores, pesaje o presión según proceda.`,
-        [SECTIONS[2]]: `La central queda descrita conforme al estado observado.`,
+        [SECTIONS[2]]: COMMON_STATE_FIXED_TEXT,
         [SECTIONS[3]]: `El marco general es el Real Decreto 513/2017 RIPCI. Para rociadores automáticos puede aplicarse UNE-EN 12845. Para sistemas de extinción gaseosa, agua nebulizada, espuma u otros agentes se utilizará la norma UNE/EN específica del sistema instalado, junto con el CTE DB-SI o el RSCIEI vigente según el uso del edificio o establecimiento.
 
 Real Decreto 513/2017, RIPCI: Reglamento principal aplicable a los equipos y sistemas de protección activa contra incendios y a su mantenimiento.
@@ -1111,7 +1134,7 @@ Las observaciones recogidas en el informe reflejan el estado apreciado en la fec
       [SYSTEMS[3]]: {
         [SECTIONS[0]]: `Se revisa el grupo de presión contra incendios asociado a la red de agua PCI del edificio o instalación. Analizando la configuración del equipo, bombas principales, bomba jockey, cuadro eléctrico, colectores, válvulas, manómetros, presostatos, depósito de alimentación y relación con BIE, hidrantes, rociadores u otros sistemas abastecidos.`,
         [SECTIONS[1]]: `Se comprueba el estado general del grupo, presión de reposo, arranque y parada de bombas según procedimiento disponible, estado del cuadro de control, alimentación eléctrica, baterías de bomba diésel, nivel de combustible, aceite, refrigeración, válvulas de aspiración e impulsión, presostatos, manómetros, colectores, posibles fugas y estado del depósito. Se anotarán contadores de arranque, horas de funcionamiento y cualquier variación significativa observada.`,
-        [SECTIONS[2]]: `Es importante el estado de cada bomba y sus elementos auxiliares.`,
+        [SECTIONS[2]]: COMMON_STATE_FIXED_TEXT,
         [SECTIONS[3]]: `El grupo de presión se encuadra en el RIPCI y en la UNE 23500 relativa a sistemas de abastecimiento de agua contra incendios. En función del edificio, también puede vincularse al CTE DB-SI o al RSCIEI vigente. Si abastece rociadores, debe coordinarse además con UNE-EN 12845 en lo que afecte al suministro requerido por el sistema.
 
 Real Decreto 513/2017, RIPCI: Reglamento principal aplicable a las instalaciones de protección contra incendios y a su mantenimiento.
@@ -1129,7 +1152,7 @@ Las incidencias indicadas corresponden al estado real del grupo de presión en l
       [SYSTEMS[4]]: {
         [SECTIONS[0]]: `Se revisa la red de agua contra incendios asociada a los sistemas de BIE, hidrantes, columna seca, rociadores u otros puntos de consumo PCI, su alimentación, válvulas, tramos visibles, armarios, equipos terminales, presión disponible si se mide y estado de los elementos accesibles.`,
         [SECTIONS[1]]: `Se comprueba visualmente el estado de tuberías accesibles, válvulas, señalización, armarios etc.`,
-        [SECTIONS[2]]: `El sistema queda descrito conforme al estado observado.`,
+        [SECTIONS[2]]: COMMON_STATE_FIXED_TEXT,
         [SECTIONS[3]]: `La red de agua PCI se encuadra en el RIPCI para los sistemas instalados, incluyendo BIE, hidrantes, columna seca y sistemas fijos de extinción por agua cuando proceda. Para el abastecimiento se utiliza como referencia UNE 23500, y para rociadores automáticos UNE-EN 12845. En edificios no industriales se considerará CTE DB-SI; en establecimientos industriales, el RSCIEI vigente.
 
 Real Decreto 513/2017, RIPCI: Reglamento principal aplicable a las instalaciones de protección contra incendios y a su mantenimiento.
@@ -1150,7 +1173,7 @@ Las incidencias reflejadas en el informe corresponden al estado apreciado en la 
       [SYSTEMS[5]]: {
         [SECTIONS[0]]: `Durante la revisión se comprueba el sistema de detección de monóxido de carbono instalado en la dependencia indicada. El informe recoge el estado observado en la central o equipo de control, detectores, señalización, alimentación, avisos, averías, alarmas, ventilación asociada cuando exista y demás elementos accesibles vinculados al sistema.`,
         [SECTIONS[1]]: `Se realiza comprobación visual y funcional del sistema, revisando el estado general de los equipos, indicaciones de pantalla o pilotos, alimentación, baterías si procede, detectores de monóxido, líneas o zonas asociadas, señalización acústica/luminosa y comunicaciones con sistemas auxiliares. Las comprobaciones se documentan conforme al estado observado durante la intervención.`,
-        [SECTIONS[2]]: `El sistema queda descrito conforme al estado observado.`,
+        [SECTIONS[2]]: COMMON_STATE_FIXED_TEXT,
         [SECTIONS[3]]: `El sistema de detección de monóxido se analiza dentro del marco normativo aplicable a las instalaciones de protección y seguridad del edificio, atendiendo a la reglamentación vigente, documentación técnica del fabricante, mantenimiento indicado para detectores de gases y normativa específica que resulte aplicable según el uso del recinto.
 
 Real Decreto 513/2017, RIPCI: Aplicable cuando el sistema forme parte de instalaciones vinculadas a protección contra incendios o seguridad asociada.
@@ -1176,6 +1199,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         entries: [],
         notes: ""
       },
+      fixedTextRevision: FIXED_TEXT_REVISION,
       fixedTexts: cloneData(DEFAULT_FIXED_TEXTS),
       listing: emptyListing(),
       savedReports: []
@@ -1277,6 +1301,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       state.current.revisionText = (state.current.revisionText || "TRIMESTRAL").toUpperCase();
       state.current.systems = state.current.systems || {};
       state.current.entries = Array.isArray(state.current.entries) ? state.current.entries : entriesFromSystems(state.current.systems);
+      state.current.entries = sortBySystemOrder(state.current.entries);
       state.current.editingId = state.current.editingId || null;
       state.current.notes = state.current.notes || "";
       state.fixedTexts = mergeDefaultFixedTexts(state.fixedTexts || {});
@@ -1285,7 +1310,33 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       state.savedReports.forEach(report => {
         report.notes = report.notes || "";
       });
+      applyFixedTextRevision(state);
       return state;
+    }
+
+    function applyFixedTextRevision(state) {
+      if (Number(state.fixedTextRevision || 0) >= FIXED_TEXT_REVISION) return;
+
+      const updateEntry = entry => {
+        if (!entry || typeof entry !== "object") return;
+        entry.sections = entry.sections || {};
+        entry.sections[SECTIONS[2]] = entry.sections[SECTIONS[2]] || emptySection();
+        entry.sections[SECTIONS[2]].fixed = COMMON_STATE_FIXED_TEXT;
+        entry.mountedHtml = "";
+        entry.mountedText = "";
+      };
+
+      SYSTEMS.forEach(system => {
+        if (!state.fixedTexts[system]) state.fixedTexts[system] = {};
+        state.fixedTexts[system][SECTIONS[2]] = COMMON_STATE_FIXED_TEXT;
+      });
+      (state.current.entries || []).forEach(updateEntry);
+      Object.values(state.current.systems || {}).forEach(updateEntry);
+      (state.savedReports || []).forEach(report => {
+        (report.sourceEntries || []).forEach(updateEntry);
+        Object.values(report.sourceSystems || {}).forEach(updateEntry);
+      });
+      state.fixedTextRevision = FIXED_TEXT_REVISION;
     }
 
     function normalizeListing(listing) {
@@ -1464,6 +1515,23 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       return chunks;
     }
 
+    function systemOrderIndex(item) {
+      const name = typeof item === "string" ? item : (item?.type || item?.name || "");
+      const index = SYSTEMS.indexOf(name);
+      return index >= 0 ? index : SYSTEMS.length;
+    }
+
+    function sortBySystemOrder(items) {
+      return (items || [])
+        .map((item, originalIndex) => ({ item, originalIndex }))
+        .sort((a, b) => systemOrderIndex(a.item) - systemOrderIndex(b.item) || a.originalIndex - b.originalIndex)
+        .map(({ item }) => item);
+    }
+
+    function sortCurrentEntries() {
+      appState.current.entries = sortBySystemOrder(appState.current.entries);
+    }
+
     function showScreen(name, options = {}) {
       [els.homeScreen, els.newReportScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.quickSystemScreen, els.wordTextScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
       document.getElementById(name).classList.add("active");
@@ -1517,6 +1585,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       if (!target) {
         target = makeEntry(activeSystem || SYSTEMS[0]);
         appState.current.entries.push(target);
+        sortCurrentEntries();
         activeEntryId = target.id;
       }
 
@@ -1584,8 +1653,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         <button class="btn lime ${system === SYSTEMS[5] ? "system-monoxide" : ""}" type="button" data-system="${escapeHtml(system)}">${escapeHtml(system)}</button>
       `).join("");
 
-      els.preparedEntries.innerHTML = appState.current.entries.length
-        ? appState.current.entries.map((entry, index) => `
+      const orderedEntries = sortBySystemOrder(appState.current.entries);
+      els.preparedEntries.innerHTML = orderedEntries.length
+        ? orderedEntries.map((entry, index) => `
           <div class="prepared-item">
             <div>
               <strong>${index + 1}. ${escapeHtml(systemListTitle(entry))}</strong>
@@ -1617,8 +1687,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
     function renderPreparedEntries(target) {
       const container = target === "report" ? els.reportPreparedEntries : els.preparedEntries;
-      container.innerHTML = appState.current.entries.length
-        ? appState.current.entries.map((entry, index) => `
+      const orderedEntries = sortBySystemOrder(appState.current.entries);
+      container.innerHTML = orderedEntries.length
+        ? orderedEntries.map((entry, index) => `
           <div class="prepared-item">
             <div>
               <strong>${index + 1}. ${escapeHtml(systemListTitle(entry))}</strong>
@@ -2377,7 +2448,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     function collectCurrentSystems() {
-      return appState.current.entries
+      return sortBySystemOrder(appState.current.entries)
         .map(entry => ({ name: entry.type, data: ensureEntry(entry.id) }))
         .filter(item => item.data.mountedHtml || hasSystemContent(item.data))
         .map(item => {
@@ -2402,6 +2473,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         revisionText: appState.current.revisionText,
         notes: appState.current.notes || "",
         systems: collectCurrentSystems(),
+        sourceEntries: cloneData(appState.current.entries),
         createdAt: new Date().toISOString()
       };
     }
@@ -2436,7 +2508,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       appState.savedReports.forEach(report => {
         if (!report.id) report.id = makeId();
         report.number = Number(report.number || 0);
-        report.systems = Array.isArray(report.systems) ? report.systems : [];
+        report.systems = sortBySystemOrder(Array.isArray(report.systems) ? report.systems : []);
+        if (Array.isArray(report.sourceEntries)) report.sourceEntries = sortBySystemOrder(report.sourceEntries);
         report.notes = report.notes || "";
         byId.set(report.id, report);
       });
@@ -2476,10 +2549,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     function entriesFromSavedReport(report) {
-      if (report.sourceEntries) return cloneData(report.sourceEntries);
-      if (report.sourceSystems) return entriesFromSystems(report.sourceSystems);
+      if (report.sourceEntries) return sortBySystemOrder(cloneData(report.sourceEntries));
+      if (report.sourceSystems) return sortBySystemOrder(entriesFromSystems(report.sourceSystems));
 
-      return (report.systems || []).map(item => ({
+      return sortBySystemOrder((report.systems || []).map(item => ({
         id: makeId(),
         type: item.name,
         meta: item.meta || {
@@ -2494,7 +2567,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         chatGptResult: "",
         mountedHtml: item.html || "",
         mountedText: item.text || ""
-      }));
+      })));
     }
 
     function openSavedReport(report) {
@@ -2620,7 +2693,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     function buildFullHtml(report) {
       const systems = systemsForOutput(report);
       const blankPage = '<div class="blank-page" aria-hidden="true"></div>';
-      return `<div class="doc">${buildReportCover({ ...report, systems })}${systems.map(system => system.html).join(blankPage)}</div>`;
+      return `<div class="doc">${buildReportCover({ ...report, systems })}${buildGroupedSystemsHtml(systems, blankPage)}</div>`;
     }
 
     function buildAllReportsHtml() {
@@ -2635,7 +2708,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       const blankPage = '<div class="blank-page" aria-hidden="true"></div>';
       const bodies = reports.map(report => {
         const systems = systemsForOutput(report);
-        return `${buildReportCover({ ...report, systems })}${systems.map(system => system.html).join(blankPage)}`;
+        return `${buildReportCover({ ...report, systems })}${buildGroupedSystemsHtml(systems, blankPage)}`;
       });
       return `<div class="doc">${bodies.join(pageBreak)}</div>`;
     }
@@ -2657,18 +2730,89 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     function systemsForOutput(report) {
       if (Array.isArray(report.sourceEntries) && report.sourceEntries.length) {
-        return report.sourceEntries.map(entry => {
+        return sortBySystemOrder(report.sourceEntries).map(entry => {
           const built = composeEntryReport(entry);
           return {
             name: entry.type,
             meta: cloneData(entry.meta),
             html: built.html,
             text: built.text,
-            photos: (entry.photos || []).filter(Boolean)
+            photos: (entry.photos || []).filter(Boolean),
+            entry
           };
         });
       }
-      return Array.isArray(report.systems) ? report.systems : [];
+      return sortBySystemOrder(Array.isArray(report.systems) ? report.systems : []);
+    }
+
+    function buildGroupedSystemsHtml(systems, separator) {
+      const groups = SYSTEMS
+        .map(system => ({ system, items: systems.filter(item => item.name === system) }))
+        .filter(group => group.items.length);
+      let equipmentOffset = 0;
+      return groups.map(group => {
+        const html = composeSystemGroupHtml(group.system, group.items, equipmentOffset);
+        equipmentOffset += group.items.length;
+        return html;
+      }).join(separator);
+    }
+
+    function composeSystemGroupHtml(system, items, equipmentOffset) {
+      const fixedSections = SECTIONS.map(section => `
+        <div class="doc-section">
+          <h3>${escapeHtml(section)}</h3>
+          <p>${escapeHtml(getSystemFixedText(system, section))}</p>
+        </div>
+      `).join("");
+
+      const reviewedItems = items.map((item, index) => composeReviewedEquipmentHtml(item, equipmentOffset + index)).join("");
+      return `
+        <section class="doc-part system-group">
+          <div class="doc-system-title">${escapeHtml(system)}</div>
+          ${fixedSections}
+          <div class="reviewed-list-title">Equipos revisados</div>
+          ${reviewedItems}
+        </section>
+      `;
+    }
+
+    function composeReviewedEquipmentHtml(item, index) {
+      const data = item.entry;
+      if (!data) {
+        return `<div class="reviewed-equipment"><div class="reviewed-equipment-title">${index + 1}. ${escapeHtml(item.meta?.denomination || item.name)}</div>${item.html || ""}</div>`;
+      }
+
+      const heading = [
+        data.meta?.client,
+        data.meta?.building,
+        data.meta?.denomination || data.meta?.system || data.type
+      ].filter(Boolean).join(" - ");
+      const selectedChecks = SYSTEM_CHECKS.filter(label => data.checks?.[label]);
+      const checksHtml = selectedChecks.length
+        ? `<div class="doc-section"><h3>Estado marcado</h3><p>${escapeHtml(selectedChecks.join(", "))}.</p></div>`
+        : "";
+      const checkNotesHtml = selectedChecks
+        .filter(label => (data.checkNotes?.[label] || "").trim())
+        .map(label => `<div class="doc-section"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(data.checkNotes[label].trim())}</p></div>`)
+        .join("");
+      const voiceText = SECTIONS
+        .map(section => (data.sections?.[section]?.voice || "").trim())
+        .filter(Boolean)
+        .join(" ");
+      const voiceHtml = voiceText
+        ? `<div class="doc-section"><h3>Datos de la revisión</h3><p>${escapeHtml(voiceText)}</p></div>`
+        : "";
+      const photos = (data.photos || []).filter(Boolean);
+      const photoHtml = photos.length
+        ? `<div class="photo-title">ANEXO FOTOGRÁFICO</div>${chunkArray(photos, 4).map(group => `<div class="photo-page"><div class="photo-grid">${group.map(src => `<div class="photo-card"><img src="${src}" alt=""></div>`).join("")}</div></div>`).join("")}`
+        : "";
+
+      return `
+        <div class="reviewed-equipment">
+          <div class="reviewed-equipment-title">${index + 1}. ${escapeHtml(heading || data.type)}</div>
+          ${checksHtml}${checkNotesHtml}${voiceHtml}${photoHtml}
+        </div>
+      `;
     }
 
     function downloadWord(html, filename) {
@@ -2687,6 +2831,9 @@ ${item.voice.trim() || "Sin texto aportado."}`;
             .summary-head { background: #ae93e4; text-align: center; font-weight: 700; }
             .summary-table td { background: #e5dcf5; }
             .doc-system-title { text-align: center; text-transform: uppercase; font-size: 13pt; font-weight: 700; line-height: 1.35; margin-bottom: 16px; }
+            .reviewed-equipment { margin-top: 24px; padding-top: 18px; border-top: 2px solid #555; }
+            .reviewed-equipment-title, .reviewed-list-title { margin: 0 0 12px; font-size: 12pt; font-weight: 700; text-transform: uppercase; }
+            .reviewed-list-title { margin-top: 24px; }
             .doc-notes-text { white-space: pre-wrap; font-size: 11pt; line-height: 1.55; margin-top: 22px; }
             .page-break { page-break-after: always; break-after: page; height: 0; }
             .blank-page { page-break-before: always; page-break-after: always; break-before: page; break-after: page; min-height: 980px; }
@@ -3139,6 +3286,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         systemReturnScreen = "newReport";
         const entry = makeEntry(button.dataset.system);
         appState.current.entries.push(entry);
+        sortCurrentEntries();
         activeEntryId = entry.id;
         renderEntry(entry.id);
       }
@@ -3149,6 +3297,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       if (button) {
         const entry = makeEntry(button.dataset.system);
         appState.current.entries.push(entry);
+        sortCurrentEntries();
         activeEntryId = entry.id;
         if (reportReturnScreen === "newReportScreen") {
           renderQuickEntry(entry.id);
@@ -3310,7 +3459,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=25", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=28", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

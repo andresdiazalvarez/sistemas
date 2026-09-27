@@ -1015,8 +1015,12 @@
           <div id="checkTextContainer" class="check-text-grid"></div>
         </div>
 
+        <h2>Imágenes</h2>
+        <div id="quickPhotoContainer" class="photos"></div>
+
         <div class="button-row" style="margin-top: 18px;">
           <button id="saveQuickSystemBtn" class="btn green" type="button">Grabar</button>
+          <button id="viewQuickSystemBtn" class="btn violet" type="button">Ver</button>
         </div>
         <div id="quickSystemStatus" class="status" aria-live="polite"></div>
       </div>
@@ -1311,6 +1315,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       quickMetaBuilding: document.getElementById("quickMetaBuilding"),
       quickMetaSystem: document.getElementById("quickMetaSystem"),
       quickMetaDenomination: document.getElementById("quickMetaDenomination"),
+      quickPhotoContainer: document.getElementById("quickPhotoContainer"),
       quickSystemStatus: document.getElementById("quickSystemStatus"),
       wordTextContent: document.getElementById("wordTextContent"),
       wordTextStatus: document.getElementById("wordTextStatus"),
@@ -2008,7 +2013,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       saveState();
     }
 
-    function renderQuickEntry(entryId) {
+    function renderQuickEntry(entryId, options = {}) {
       activeEntryId = entryId;
       const data = ensureEntry(entryId);
       activeSystem = data.type;
@@ -2036,9 +2041,23 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
           <textarea data-check-note="${escapeHtml(label)}" placeholder="Escribe aquí los datos de ${escapeHtml(label.toLowerCase())}">${escapeHtml(data.checkNotes[label] || "")}</textarea>
         </div>
       `).join("");
+      els.quickPhotoContainer.innerHTML = data.photos.map((photo, index) => `
+        <div class="photo-slot">
+          <div class="photo-preview">${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}`}</div>
+          <div class="photo-inputs">
+            <label>Buscar imagen
+              <input type="file" accept="image/*" data-photo="${index}">
+            </label>
+            <label>Hacer foto
+              <input type="file" accept="image/*" capture="environment" data-photo="${index}">
+            </label>
+          </div>
+          <button class="btn red" type="button" data-delete-photo="${index}">Eliminar foto</button>
+        </div>
+      `).join("");
       setStatus(els.quickSystemStatus, "");
       saveState();
-      showScreen("quickSystemScreen");
+      showScreen("quickSystemScreen", { keepScroll: options.keepScroll });
     }
 
     function saveQuickInputs() {
@@ -2184,7 +2203,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function buildSystemReport(entryId) {
-      saveSystemInputs();
+      if (appState.current.format === "new") saveQuickInputs();
+      else saveSystemInputs();
       const data = ensureEntry(entryId);
       const report = composeEntryReport(data);
 
@@ -2537,7 +2557,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     function makeCurrentReportSnapshot() {
-      saveSystemInputs();
+      if (appState.current.format === "new") saveQuickInputs();
+      else saveSystemInputs();
       return {
         id: "current",
         number: appState.current.number,
@@ -3270,6 +3291,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       saveQuickInputs();
       setStatus(els.quickSystemStatus, `${activeSystem} grabado.`);
     });
+    document.getElementById("viewQuickSystemBtn").addEventListener("click", () => {
+      saveQuickInputs();
+      viewCurrentEntry();
+    });
     document.getElementById("backFromPreviewBtn").addEventListener("click", () => {
       if (previewMode === "set") {
         if (previewReturnScreen === "report") showCurrentReportScreen();
@@ -3278,7 +3303,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
           showScreen("newReportScreen");
         }
       } else {
-        renderEntry(activeEntryId);
+        if (appState.current.format === "new") renderQuickEntry(activeEntryId);
+        else renderEntry(activeEntryId);
       }
     });
     document.getElementById("saveEntryBtn").addEventListener("click", saveCurrentEntry);
@@ -3555,6 +3581,46 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       renderEntry(activeEntryId);
     });
 
+    els.quickPhotoContainer.addEventListener("change", async event => {
+      const input = event.target.closest("[data-photo]");
+      if (!input || !input.files[0]) return;
+      const data = ensureEntry(activeEntryId);
+      const index = Number(input.dataset.photo);
+      try {
+        const previous = data.photos[index];
+        if (previous && !window.confirm(`La foto ${index + 1} ya existe. ¿Quieres sustituirla por la nueva?`)) {
+          input.value = "";
+          return;
+        }
+        data.photos[index] = await compressImageFile(input.files[0]);
+        data.mountedHtml = "";
+        data.mountedText = "";
+        if (!saveState()) {
+          data.photos[index] = previous;
+          return;
+        }
+        renderQuickEntry(activeEntryId, { keepScroll: true });
+        els.quickPhotoContainer.scrollIntoView({ block: "start" });
+      } catch (error) {
+        setStatus(els.quickSystemStatus, "No se pudo cargar la imagen.", true);
+      }
+    });
+
+    els.quickPhotoContainer.addEventListener("click", event => {
+      const button = event.target.closest("[data-delete-photo]");
+      if (!button) return;
+      const data = ensureEntry(activeEntryId);
+      const index = Number(button.dataset.deletePhoto);
+      if (!data.photos[index]) return;
+      if (!window.confirm(`¿Quieres eliminar definitivamente la foto ${index + 1}?`)) return;
+      data.photos[index] = null;
+      data.mountedHtml = "";
+      data.mountedText = "";
+      saveState();
+      renderQuickEntry(activeEntryId, { keepScroll: true });
+      els.quickPhotoContainer.scrollIntoView({ block: "start" });
+    });
+
     window.addEventListener("beforeinstallprompt", event => {
       event.preventDefault();
       deferredInstallPrompt = event;
@@ -3568,7 +3634,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=33", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=34", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

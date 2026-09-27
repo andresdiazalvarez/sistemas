@@ -1244,6 +1244,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       nextNumber: 1,
       current: {
         number: 1,
+        format: "old",
         header: "",
         revisionNumber: "1 RT-2026",
         revisionText: "TRIMESTRAL",
@@ -2412,6 +2413,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       const report = {
         id: existingIndex >= 0 ? appState.savedReports[existingIndex].id : makeId(),
         number: appState.current.number,
+        format: appState.current.format || "old",
         header: appState.current.header,
         revisionNumber: appState.current.revisionNumber,
         revisionText: appState.current.revisionText,
@@ -2432,6 +2434,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       appState.nextNumber = getNextReportNumber();
       appState.current = {
         number: appState.nextNumber,
+        format: "old",
         header: "",
         revisionNumber: "1 RT-2026",
         revisionText: "TRIMESTRAL",
@@ -2473,6 +2476,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       appState.savedReports[existingIndex] = {
         ...appState.savedReports[existingIndex],
         number: appState.current.number,
+        format: appState.current.format || "new",
         header: appState.current.header,
         revisionNumber: appState.current.revisionNumber,
         revisionText: appState.current.revisionText,
@@ -2496,6 +2500,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       appState.nextNumber = getNextReportNumber();
       appState.current = {
         number: appState.nextNumber || 1,
+        format: "old",
         header: "",
         revisionNumber: "1 RT-2026",
         revisionText: "TRIMESTRAL",
@@ -2640,8 +2645,12 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     function openSavedReport(report) {
       const entries = entriesFromSavedReport(report);
+      const inferredFormat = (report.sourceEntries || []).some(entry =>
+        Object.keys(entry.checks || {}).length || Object.keys(entry.checkNotes || {}).length
+      ) ? "new" : "old";
       appState.current = {
         number: report.number,
+        format: report.format || inferredFormat,
         header: report.header || "",
         revisionNumber: report.revisionNumber || "1 RT-2026",
         revisionText: report.revisionText || "TRIMESTRAL",
@@ -2656,6 +2665,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     function startNewReport() {
+      appState.current.format = "old";
       const hasDraft = Boolean(
         appState.current.header.trim()
         || appState.current.notes.trim()
@@ -2687,6 +2697,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       appState.nextNumber = getNextReportNumber();
       appState.current = {
         number: appState.nextNumber,
+        format: "old",
         header: "",
         revisionNumber: "1 RT-2026",
         revisionText: "TRIMESTRAL",
@@ -2702,6 +2713,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     function startNewSystemReport() {
       startNewReport();
+      appState.current.format = "new";
+      saveState();
       showCurrentReportScreen("Selecciona un sistema amarillo para comenzar el informe.", "homeScreen");
     }
 
@@ -2717,6 +2730,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         appState.nextNumber = getNextReportNumber();
         appState.current = {
             number: appState.nextNumber,
+            format: "old",
             header: "",
             revisionNumber: "1 RT-2026",
             revisionText: "TRIMESTRAL",
@@ -2735,6 +2749,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       appState.nextNumber = Math.max(getNextReportNumber(), Number(appState.current.number || 0) + 1);
       appState.current = {
         number: appState.nextNumber,
+        format: "old",
         header: "",
         revisionNumber: "1 RT-2026",
         revisionText: "TRIMESTRAL",
@@ -3389,7 +3404,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         appState.current.entries.push(entry);
         sortCurrentEntries();
         activeEntryId = entry.id;
-        if (reportReturnScreen === "newReportScreen") {
+        if (appState.current.format === "new") {
           renderQuickEntry(entry.id);
         } else {
           systemReturnScreen = "report";
@@ -3419,7 +3434,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     els.reportPreparedEntries.addEventListener("click", event => {
       const editButton = event.target.closest("[data-edit-entry]");
       if (editButton) {
-        if (reportReturnScreen === "newReportScreen") {
+        if (appState.current.format === "new") {
           renderQuickEntry(editButton.dataset.editEntry);
         } else {
           systemReturnScreen = "report";
@@ -3455,6 +3470,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         if (appState.current.editingId === report.id) {
           appState.current = {
             number: appState.nextNumber || 1,
+            format: "old",
             header: "",
             revisionNumber: "1 RT-2026",
             revisionText: "TRIMESTRAL",
@@ -3552,7 +3568,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=32", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=33", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

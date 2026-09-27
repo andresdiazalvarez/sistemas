@@ -144,6 +144,20 @@
     .btn.violet { background: var(--violet); border-color: #5b21b6; color: #fff; }
     .btn.red { background: var(--red); border-color: #b42318; color: #fff; }
 
+    .home-create-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    .new-system-launch {
+      width: 320px;
+      max-width: 100%;
+      min-height: 84px;
+      font-size: 1.15rem;
+    }
+
     .report-number {
       font-size: 1.08rem;
       background: var(--lime);
@@ -770,7 +784,10 @@
       <div class="panel">
         <div class="toolbar">
           <h2 id="homeTitle">Informes grabados</h2>
-          <button id="newReportBtn" class="btn pink" type="button">Crear nuevo informe</button>
+          <div class="home-create-actions">
+            <button id="newReportBtn" class="btn pink" type="button">Crear nuevo informe</button>
+            <button id="newSystemBtn" class="btn blue new-system-launch" type="button">SISTEMA NUEVO</button>
+          </div>
         </div>
         <div id="savedReports" class="saved-list"></div>
       </div>
@@ -790,7 +807,6 @@
           </div>
           <div class="button-row">
             <button id="downloadAllPdfBtn" class="btn green" type="button">Descargar todo en PDF</button>
-            <button id="downloadAllWordBtn" class="btn blue" type="button">Ver informe</button>
             <button id="deleteCurrentBtn" class="btn red" type="button">Borrar informe actual</button>
           </div>
         </div>
@@ -2179,9 +2195,6 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
     function composeEntryReport(data) {
       const selectedChecks = SYSTEM_CHECKS.filter(label => data.checks?.[label]);
-      const checksHtml = selectedChecks.length
-        ? `<div class="doc-section"><h3>Estado marcado</h3><p>${escapeHtml(selectedChecks.join(", "))}.</p></div>`
-        : "";
       const checkNotesHtml = SYSTEM_CHECKS
         .filter(label => data.checks?.[label] && (data.checkNotes?.[label] || "").trim())
         .map(label => `<div class="doc-section"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(data.checkNotes[label].trim())}</p></div>`)
@@ -2203,7 +2216,6 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       const html = `
         <section class="doc-part">
           <div class="doc-system-title">${systemHeading}</div>
-          ${checksHtml}
           ${checkNotesHtml}
           ${sectionHtml}
           ${photoHtml}
@@ -2212,7 +2224,6 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
       const text = [
         data.type,
-        ...(selectedChecks.length ? ["Estado marcado", selectedChecks.join(", ")] : []),
         ...SYSTEM_CHECKS.flatMap(label => {
           const note = (data.checkNotes?.[label] || "").trim();
           return data.checks?.[label] && note ? [label, note] : [];
@@ -2689,6 +2700,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       showScreen("newReportScreen");
     }
 
+    function startNewSystemReport() {
+      startNewReport();
+      showCurrentReportScreen("Selecciona un sistema amarillo para comenzar el informe.", "homeScreen");
+    }
+
     function clearCurrentReport() {
       const message = appState.current.editingId
         ? `¿Quieres eliminar definitivamente el Informe ${appState.current.number} completo?`
@@ -2845,9 +2861,6 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         data.meta?.denomination || data.meta?.system || data.type
       ].filter(Boolean).join(" - ");
       const selectedChecks = SYSTEM_CHECKS.filter(label => data.checks?.[label]);
-      const checksHtml = selectedChecks.length
-        ? `<div class="doc-section"><h3>Estado marcado</h3><p>${escapeHtml(selectedChecks.join(", "))}.</p></div>`
-        : "";
       const checkNotesHtml = selectedChecks
         .filter(label => (data.checkNotes?.[label] || "").trim())
         .map(label => `<div class="doc-section"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(data.checkNotes[label].trim())}</p></div>`)
@@ -2867,7 +2880,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       return `
         <div class="reviewed-equipment">
           <div class="reviewed-equipment-title">${index + 1}. ${escapeHtml(heading || data.type)}</div>
-          ${checksHtml}${checkNotesHtml}${voiceHtml}${photoHtml}
+          ${checkNotesHtml}${voiceHtml}${photoHtml}
         </div>
       `;
     }
@@ -3173,6 +3186,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       showScreen("listingScreen");
     });
     document.getElementById("newReportBtn").addEventListener("click", startNewReport);
+    document.getElementById("newSystemBtn").addEventListener("click", startNewSystemReport);
     document.getElementById("backFromNewReportBtn").addEventListener("click", () => {
       renderHome();
       showScreen("homeScreen");
@@ -3287,10 +3301,6 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
       await downloadPdfFromHtml(html, "informes-sistemas.pdf");
     });
-    document.getElementById("downloadAllWordBtn").addEventListener("click", () => {
-      showCurrentReportScreen("Selecciona un sistema amarillo para escribir o modificar sus textos redactados por voz.", "newReportScreen");
-    });
-
     els.reportHeader.addEventListener("input", () => {
       appState.current.header = els.reportHeader.value.toUpperCase();
       els.reportHeader.value = appState.current.header;
@@ -3542,7 +3552,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=30", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=32", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

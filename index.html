@@ -969,6 +969,26 @@
           <button id="backFromQuickSystemBtn" class="btn" type="button">Volver</button>
         </div>
 
+        <h2>Datos del cuadro resumen</h2>
+        <div class="meta-grid">
+          <div class="field">
+            <label for="quickMetaClient">Cliente</label>
+            <input id="quickMetaClient" type="text" placeholder="Cliente">
+          </div>
+          <div class="field">
+            <label for="quickMetaBuilding">Edificio</label>
+            <input id="quickMetaBuilding" type="text" placeholder="Edificio">
+          </div>
+          <div class="field">
+            <label for="quickMetaSystem">Sistema</label>
+            <input id="quickMetaSystem" type="text" placeholder="Sistema">
+          </div>
+          <div class="field">
+            <label for="quickMetaDenomination">Denominación</label>
+            <input id="quickMetaDenomination" type="text" placeholder="Denominación">
+          </div>
+        </div>
+
         <div class="section-block">
           <div class="section-title">Casilleros de estado</div>
           <div id="systemChecks" class="check-grid"></div>
@@ -1270,6 +1290,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       checkTextContainer: document.getElementById("checkTextContainer"),
       quickSystemTitle: document.getElementById("quickSystemTitle"),
       quickSystemSubtitle: document.getElementById("quickSystemSubtitle"),
+      quickMetaClient: document.getElementById("quickMetaClient"),
+      quickMetaBuilding: document.getElementById("quickMetaBuilding"),
+      quickMetaSystem: document.getElementById("quickMetaSystem"),
+      quickMetaDenomination: document.getElementById("quickMetaDenomination"),
       quickSystemStatus: document.getElementById("quickSystemStatus"),
       wordTextContent: document.getElementById("wordTextContent"),
       wordTextStatus: document.getElementById("wordTextStatus"),
@@ -1979,6 +2003,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
       els.quickSystemTitle.textContent = data.type;
       els.quickSystemSubtitle.textContent = `Informe ${appState.current.number}`;
+      els.quickMetaClient.value = data.meta.client || appState.current.header || "";
+      els.quickMetaBuilding.value = data.meta.building || "";
+      els.quickMetaSystem.value = data.meta.system || data.type;
+      els.quickMetaDenomination.value = data.meta.denomination || data.type;
       els.systemChecks.innerHTML = SYSTEM_CHECKS.map(label => `
         <label class="check-option">
           <input type="checkbox" data-system-check="${escapeHtml(label)}" ${data.checks[label] ? "checked" : ""}>
@@ -1999,6 +2027,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     function saveQuickInputs() {
       if (!activeEntryId) return;
       const data = ensureEntry(activeEntryId);
+      data.meta.client = els.quickMetaClient.value;
+      data.meta.building = els.quickMetaBuilding.value;
+      data.meta.system = els.quickMetaSystem.value;
+      data.meta.denomination = els.quickMetaDenomination.value;
       SYSTEM_CHECKS.forEach(label => {
         const checkbox = els.systemChecks.querySelector(`[data-system-check="${CSS.escape(label)}"]`);
         const note = els.checkTextContainer.querySelector(`[data-check-note="${CSS.escape(label)}"]`);
@@ -3450,6 +3482,9 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     els.sectionContainer.addEventListener("input", saveSystemInputs);
     els.systemChecks.addEventListener("change", saveQuickInputs);
     els.checkTextContainer.addEventListener("input", saveQuickInputs);
+    [els.quickMetaClient, els.quickMetaBuilding, els.quickMetaSystem, els.quickMetaDenomination].forEach(input => {
+      input.addEventListener("input", saveQuickInputs);
+    });
     els.sectionContainer.addEventListener("click", event => {
       const button = event.target.closest("[data-dictate]");
       if (button) startDictation(button.dataset.dictate);
@@ -3507,7 +3542,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=29", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=30", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

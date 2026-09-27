@@ -862,6 +862,22 @@
           <button id="downloadReportDetailWordBtn" class="btn blue" type="button">Cabeceras</button>
         </div>
 
+        <div class="field">
+          <label for="reportDetailHeader">Cabecera del informe</label>
+          <input id="reportDetailHeader" type="text" placeholder="Ejemplo: BAE 06 - RESIDENCIA INFANTE DON JUAN">
+        </div>
+
+        <div class="short-fields">
+          <div class="field">
+            <label for="reportDetailRevisionNumber">Nº revisión</label>
+            <input id="reportDetailRevisionNumber" type="text" value="1 RT-2026">
+          </div>
+          <div class="field">
+            <label for="reportDetailRevisionText">Revisión</label>
+            <input id="reportDetailRevisionText" type="text" value="TRIMESTRAL">
+          </div>
+        </div>
+
         <h2>Sistemas</h2>
         <div class="field">
           <label for="reportNotes">Datos del informe</label>
@@ -1240,6 +1256,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       listingStatus: document.getElementById("listingStatus"),
       reportDetailTitle: document.getElementById("reportDetailTitle"),
       reportDetailSubtitle: document.getElementById("reportDetailSubtitle"),
+      reportDetailHeader: document.getElementById("reportDetailHeader"),
+      reportDetailRevisionNumber: document.getElementById("reportDetailRevisionNumber"),
+      reportDetailRevisionText: document.getElementById("reportDetailRevisionText"),
       reportSystemButtons: document.getElementById("reportSystemButtons"),
       reportPreparedEntries: document.getElementById("reportPreparedEntries"),
       reportNotes: document.getElementById("reportNotes"),
@@ -1707,6 +1726,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     function renderReportScreen() {
       els.reportDetailTitle.textContent = currentReportTitle();
       els.reportDetailSubtitle.textContent = `Nº revisión: ${appState.current.revisionNumber || "1 RT-2026"} | Revisión: ${appState.current.revisionText || "TRIMESTRAL"}`;
+      els.reportDetailHeader.value = (appState.current.header || "").toUpperCase();
+      els.reportDetailRevisionNumber.value = (appState.current.revisionNumber || "1 RT-2026").toUpperCase();
+      els.reportDetailRevisionText.value = (appState.current.revisionText || "TRIMESTRAL").toUpperCase();
       els.reportNotes.value = appState.current.notes || "";
       els.reportSystemButtons.innerHTML = SYSTEMS.map(system => `
         <button class="btn lime ${system === SYSTEMS[5] ? "system-monoxide" : ""}" type="button" data-system="${escapeHtml(system)}">${escapeHtml(system)}</button>
@@ -2394,6 +2416,9 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     async function saveReportDetail() {
       saveSystemInputs();
+      appState.current.header = els.reportDetailHeader.value.toUpperCase();
+      appState.current.revisionNumber = els.reportDetailRevisionNumber.value.toUpperCase();
+      appState.current.revisionText = els.reportDetailRevisionText.value.toUpperCase();
       appState.current.notes = els.reportNotes.value;
       const systems = collectCurrentSystems();
       const existingIndex = appState.savedReports.findIndex(report => report.id === appState.current.editingId);
@@ -3255,6 +3280,29 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       saveState();
     });
 
+    els.reportDetailHeader.addEventListener("input", () => {
+      appState.current.header = els.reportDetailHeader.value.toUpperCase();
+      els.reportDetailHeader.value = appState.current.header;
+      appState.current.entries.forEach(entry => {
+        if (!entry.meta.client) entry.meta.client = appState.current.header;
+      });
+      saveState();
+    });
+
+    els.reportDetailRevisionNumber.addEventListener("input", () => {
+      appState.current.revisionNumber = els.reportDetailRevisionNumber.value.toUpperCase();
+      els.reportDetailRevisionNumber.value = appState.current.revisionNumber;
+      els.reportDetailSubtitle.textContent = `Nº revisión: ${appState.current.revisionNumber || "1 RT-2026"} | Revisión: ${appState.current.revisionText || "TRIMESTRAL"}`;
+      saveState();
+    });
+
+    els.reportDetailRevisionText.addEventListener("input", () => {
+      appState.current.revisionText = els.reportDetailRevisionText.value.toUpperCase();
+      els.reportDetailRevisionText.value = appState.current.revisionText;
+      els.reportDetailSubtitle.textContent = `Nº revisión: ${appState.current.revisionNumber || "1 RT-2026"} | Revisión: ${appState.current.revisionText || "TRIMESTRAL"}`;
+      saveState();
+    });
+
     els.reportNotes.addEventListener("input", () => {
       appState.current.notes = els.reportNotes.value;
       saveState();
@@ -3459,7 +3507,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=28", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=29", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

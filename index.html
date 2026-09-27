@@ -693,6 +693,11 @@
       margin: 22px 0 14px;
     }
 
+    .doc .photo-annex {
+      break-before: page;
+      page-break-before: always;
+    }
+
     .doc .photo-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -2230,7 +2235,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
       const photos = (data.photos || []).filter(Boolean);
       const photoHtml = photos.length
-        ? `<div class="photo-title">ANEXO FOTOGRÁFICO</div>${chunkArray(photos, 4).map(group => `<div class="photo-page"><div class="photo-grid">${group.map(src => `<div class="photo-card"><img src="${src}" alt=""></div>`).join("")}</div></div>`).join("")}`
+        ? `<div class="photo-annex"><div class="photo-title">ANEXO FOTOGRÁFICO</div>${chunkArray(photos, 4).map(group => `<div class="photo-page"><div class="photo-grid">${group.map(src => `<div class="photo-card"><img src="${src}" alt=""></div>`).join("")}</div></div>`).join("")}</div>`
         : `<div class="photo-title">ANEXO FOTOGRÁFICO</div>`;
       const systemHeading = buildSystemHeading(data);
 
@@ -2910,7 +2915,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         : "";
       const photos = (data.photos || []).filter(Boolean);
       const photoHtml = photos.length
-        ? `<div class="photo-title">ANEXO FOTOGRÁFICO</div>${chunkArray(photos, 4).map(group => `<div class="photo-page"><div class="photo-grid">${group.map(src => `<div class="photo-card"><img src="${src}" alt=""></div>`).join("")}</div></div>`).join("")}`
+        ? `<div class="photo-annex"><div class="photo-title">ANEXO FOTOGRÁFICO</div>${chunkArray(photos, 4).map(group => `<div class="photo-page"><div class="photo-grid">${group.map(src => `<div class="photo-card"><img src="${src}" alt=""></div>`).join("")}</div></div>`).join("")}</div>`
         : "";
 
       return `
@@ -2940,6 +2945,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
             .reviewed-equipment { margin-top: 24px; padding-top: 18px; border-top: 2px solid #555; }
             .reviewed-equipment-title, .reviewed-list-title { margin: 0 0 12px; font-size: 12pt; font-weight: 700; text-transform: uppercase; }
             .reviewed-list-title { margin-top: 24px; }
+            .photo-annex { page-break-before: always; break-before: page; }
             .doc-notes-text { white-space: pre-wrap; font-size: 11pt; line-height: 1.55; margin-top: 22px; }
             .page-break { page-break-after: always; break-after: page; height: 0; }
             .blank-page { page-break-before: always; page-break-after: always; break-before: page; break-after: page; min-height: 980px; }
@@ -3040,13 +3046,54 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         }
         if (child.classList.contains("doc-part")) {
           flushCover();
-          units.push(makePdfContentUnit([child.cloneNode(true)]));
+          units.push(...makePdfDocPartUnits(child));
           return;
         }
         coverNodes.push(child.cloneNode(true));
       });
       flushCover();
       return units;
+    }
+
+    function makePdfDocPartUnits(sourcePart) {
+      const annexes = Array.from(sourcePart.querySelectorAll(".photo-annex"));
+      if (!annexes.length) return [makePdfContentUnit([sourcePart.cloneNode(true)])];
+
+      const reviewedItems = Array.from(sourcePart.children).filter(child => child.classList.contains("reviewed-equipment"));
+      if (reviewedItems.length) {
+        const result = [];
+        const common = sourcePart.cloneNode(true);
+        common.querySelectorAll(".reviewed-equipment").forEach(item => item.remove());
+
+        reviewedItems.forEach((item, index) => {
+          const textItem = item.cloneNode(true);
+          textItem.querySelectorAll(".photo-annex").forEach(annex => annex.remove());
+          const textPart = index === 0 ? common : document.createElement("section");
+          if (index !== 0) textPart.className = "doc-part";
+          textPart.appendChild(textItem);
+          result.push(makePdfContentUnit([textPart]));
+
+          item.querySelectorAll(".photo-annex").forEach(annex => {
+            const photoPart = document.createElement("section");
+            photoPart.className = "doc-part";
+            photoPart.appendChild(annex.cloneNode(true));
+            result.push(makePdfContentUnit([photoPart]));
+          });
+        });
+        return result;
+      }
+
+      const result = [];
+      const textPart = sourcePart.cloneNode(true);
+      textPart.querySelectorAll(".photo-annex").forEach(annex => annex.remove());
+      result.push(makePdfContentUnit([textPart]));
+      annexes.forEach(annex => {
+        const photoPart = document.createElement("section");
+        photoPart.className = "doc-part";
+        photoPart.appendChild(annex.cloneNode(true));
+        result.push(makePdfContentUnit([photoPart]));
+      });
+      return result;
     }
 
     function makePdfContentUnit(nodes) {
@@ -3634,7 +3681,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=34", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=35", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

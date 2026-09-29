@@ -1104,6 +1104,42 @@
       "Panel"
     ];
 
+    const EXTINCTION_EXTRA_CHECKS = [
+      "Activación",
+      "Maniobras",
+      "Tuberías",
+      "Presostato",
+      "Botellas",
+      "Pesaje",
+      "Retimbrado"
+    ];
+
+    const GROUP_PRESSURE_CHECKS = [
+      "Funcionando",
+      "Con averías",
+      "Mal estado",
+      "Bomba jockey",
+      "Bomba principal eléctrica",
+      "Bomba principal diésel",
+      "Bombas desconectadas",
+      "Arranque automático / manual",
+      "Cuadros / alarmas",
+      "Baterías",
+      "Depósito / aljibe",
+      "Calderín",
+      "Presiones",
+      "Tuberías y válvulas",
+      "Sala de bombas",
+      "Caudal / curva de bombas"
+    ];
+
+    function getSystemChecks(system) {
+      if (system === SYSTEMS[3]) return GROUP_PRESSURE_CHECKS;
+      return system === SYSTEMS[2]
+        ? [...SYSTEM_CHECKS, ...EXTINCTION_EXTRA_CHECKS]
+        : SYSTEM_CHECKS;
+    }
+
     const COMMON_STATE_FIXED_TEXT = "El sistema queda descrito conforme al estado observado.";
     const FIXED_TEXT_REVISION = 2;
 
@@ -1119,8 +1155,57 @@
       "No hay sirenas": `No se observa la existencia de sirenas o dispositivos acústicos de alarma en la instalación revisada. No se identifican elementos de aviso sonoro asociados a la central. Se observa la ausencia de estos dispositivos en las zonas comprobadas.`,
       "Placa base": `La placa base de la central presenta incidencia o aviso de avería. El equipo refleja la anomalía mediante sus indicadores, pantalla o señalización disponible. Se observa que la central mantiene el mensaje correspondiente durante la revisión.`,
       "Botoneras": `Las botoneras de control presentan deficiencias de funcionamiento o conservación. Se observan mandos deteriorados, sin respuesta, con identificación deficiente o con dificultad para realizar las maniobras.`,
-      "Panel": `El panel de la central presenta deficiencias de estado o funcionamiento. Se observan avisos, indicadores, mandos o elementos de visualización con incidencia. La central no actúa ni maniobra al comandarla desde su pantalla o teclado. Se observa la falta de respuesta durante las comprobaciones realizadas.`
+      "Panel": `El panel de la central presenta deficiencias de estado o funcionamiento. Se observan avisos, indicadores, mandos o elementos de visualización con incidencia. La central no actúa ni maniobra al comandarla desde su pantalla o teclado. Se observa la falta de respuesta durante las comprobaciones realizadas.`,
+      "Activación": `El sistema de extinción dispone de detección asociada a las zonas protegidas. Para que la activación de las condiciones de alarma previstas inicie la secuencia automática de extinción, incluyendo la señalización acústica y la temporización de seguridad previa al disparo. Y así, analizado el tiempo programado, la central generará la orden de activación del sistema de extinción mediante el solenoide correspondiente.`,
+      "Maniobras": `Las maniobras asociadas al sistema de extinción incluyen la actuación automática por detección y el accionamiento mediante pulsadores manuales. La secuencia contempla la activación de sirenas de aviso, temporización, salida de extinción, solenoide y señalización de extinción disparada. El pulsador de disparo manual permite iniciar la secuencia de extinción y el pulsador de paro actúa sobre el proceso de descarga de acuerdo con la lógica configurada en la central.`,
+      "Tuberías": `La red de distribución del agente extintor está formada por tuberías, elementos de unión, soportación y difusores de descarga correspondientes a las zonas protegidas. Su estado debe permitir la correcta circulación y distribución del agente, sin deterioros, corrosión, deformaciones, obstrucciones o alteraciones que puedan afectar a la descarga.`,
+      "Presostato": `Dispone de un presostato de descarga instalado en la tubería permanece en posición de reposo mientras no se haya producido la actuación del sistema.`,
+      "Botellas": `Los recipientes de agente extintor presentan sus elementos de conexión, válvulas y dispositivos de accionamiento asociados. Se comprueba la lectura de presión en el correspondiente manómetro. Se observa un correcto estado general de los recipientes, su correcta fijación, la cantidad instalada y la fecha correspondiente a la última prueba periódica o retimbrado.`,
+      "Pesaje": `El control de la carga se determina por pesaje de los recipientes. Comprobandose una lectura correcta.`,
+      "Retimbrado": `Es preciso el retimbrado de las botellas de extinción.`
     };
+
+    const GROUP_PRESSURE_CHECK_NOTES = {
+      "Funcionando": `El grupo de presión se encuentra operativo y dispuesto en funcionamiento automático. Las bombas, cuadros de control y elementos auxiliares permanecen disponibles para su entrada en servicio ante una demanda de la instalación. No se observan avisos o anomalías que afecten al funcionamiento general del sistema.`,
+      "Con averías": `El grupo de presión presenta avisos o anomalías en alguno de sus equipos o elementos auxiliares. Las incidencias afectan a bombas, cuadros de control, sistemas de presión, alarmas o elementos hidráulicos asociados, pudiendo alterar la disponibilidad o funcionamiento del abastecimiento de agua contra incendios.`,
+      "Mal estado": `El conjunto presenta deficiencias de conservación. Se observan elementos deteriorados, suciedad, corrosión, fugas, daños mecánicos o componentes con un estado inadecuado que afectan a las condiciones generales de la instalación.`,
+      "Bomba jockey": `La bomba mantenedora de presión presenta deficiencias de funcionamiento o control. Se observan anomalías en el arranque o parada, mantenimiento de la presión, presostatos, contador de arranques o elementos auxiliares asociados. Su funcionamiento no mantiene correctamente las condiciones de presión previstas en la red.`,
+      "Bomba principal eléctrica": `La bomba principal eléctrica presenta deficiencias de funcionamiento o disponibilidad. Se observan anomalías relacionadas con el arranque automático o manual, alimentación eléctrica, cuadro de control, protecciones, señalización, motor o elementos hidráulicos asociados a la bomba.`,
+      "Bomba principal diésel": `La bomba principal diésel presenta deficiencias de funcionamiento o disponibilidad. Se observan anomalías relacionadas con el arranque automático o manual, baterías, combustible, lubricación, refrigeración, cuadro de control, alarmas o elementos auxiliares del motor y de la bomba.`,
+      "Bombas desconectadas": `Las bombas principales se encuentran desconectadas o fuera de la posición prevista para funcionamiento automático. Esta situación impide su entrada automática en servicio ante una caída de presión o demanda de agua de la instalación contra incendios.`,
+      "Arranque automático / manual": `El sistema presenta deficiencias en las maniobras de arranque. La actuación automática por descenso de presión o el accionamiento manual desde los cuadros de control no desarrolla correctamente la secuencia prevista para la entrada en funcionamiento de los equipos de bombeo.`,
+      "Cuadros / alarmas": `Los cuadros de control presentan avisos, alarmas o deficiencias en sus elementos de mando e indicación. Se observan incidencias en pilotos, selectores, señalización, avisadores acústicos, alimentación o transmisión de estados y alarmas asociados a los equipos de bombeo.`,
+      "Baterías": `El sistema de baterías presenta deficiencias de estado o carga. Se observan anomalías en baterías, bornes, conexiones, nivel de electrolito o elementos asociados al sistema de arranque, pudiendo afectar a la disponibilidad de los equipos alimentados mediante este sistema.`,
+      "Depósito / aljibe": `El depósito o aljibe de alimentación presenta deficiencias relacionadas con su estado, nivel de agua o elementos auxiliares. Se observan incidencias en el sistema de llenado, válvulas, filtros, alarma de nivel mínimo, elementos de aspiración o condiciones generales de conservación de la reserva de agua.`,
+      "Calderín": `El acumulador hidroneumático o calderín presenta una presión de precarga inadecuada, pérdida de presión o deficiencias en su estado. Esta situación puede afectar al mantenimiento estable de la presión y provocar un funcionamiento incorrecto o excesivamente frecuente de la bomba jockey.`,
+      "Presiones": `Los valores de presión de la instalación presentan anomalías respecto a las condiciones previstas de funcionamiento. Se observan incidencias en manómetros, vacuómetros, presostatos o sensores de presión, así como en los valores establecidos para el arranque y parada de los diferentes equipos de bombeo.`,
+      "Tuberías y válvulas": `Las tuberías de aspiración e impulsión, colectores, soportes o válvulas presentan deficiencias de estado o funcionamiento. Se observan corrosión, fugas, deterioros, soportación inadecuada o válvulas que no permanecen en la posición correspondiente al funcionamiento normal de la instalación.`,
+      "Sala de bombas": `La sala de bombas presenta deficiencias en sus condiciones generales. Se observan problemas de accesibilidad, limpieza, iluminación, ventilación, temperatura o presencia de materiales ajenos a la instalación que afectan a las condiciones adecuadas de conservación y disponibilidad de los equipos.`,
+      "Caudal / curva de bombas": `Las prestaciones hidráulicas del grupo presentan desviaciones respecto a los valores de referencia de la instalación. Los valores de caudal y presión no mantienen la correspondencia prevista con las características de las bombas o con las condiciones establecidas para el abastecimiento contra incendios.`
+    };
+
+    function getDefaultCheckNote(system, label) {
+      return system === SYSTEMS[3]
+        ? GROUP_PRESSURE_CHECK_NOTES[label] || ""
+        : DEFAULT_CHECK_NOTES[label] || "";
+    }
+
+    function prepareSystemCheckData(data) {
+      data.checks = data.checks && typeof data.checks === "object" ? data.checks : {};
+      data.checkNotes = data.checkNotes && typeof data.checkNotes === "object" ? data.checkNotes : {};
+      const systemChecks = getSystemChecks(data.type);
+      if (data.type === SYSTEMS[3] && data.checkPresetRevision !== "group-pressure-v1") {
+        data.checks = {};
+        data.checkNotes = {};
+        data.checkPresetRevision = "group-pressure-v1";
+      }
+      systemChecks.forEach(label => {
+        if (!Object.prototype.hasOwnProperty.call(data.checkNotes, label)) {
+          data.checkNotes[label] = getDefaultCheckNote(data.type, label);
+        }
+      });
+      return systemChecks;
+    }
 
     const STORAGE_KEY = "sistemas.informes.v2";
     const DB_NAME = "sistemas-informes-db";
@@ -2022,11 +2107,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       activeEntryId = entryId;
       const data = ensureEntry(entryId);
       activeSystem = data.type;
-      SYSTEM_CHECKS.forEach(label => {
-        if (!Object.prototype.hasOwnProperty.call(data.checkNotes, label)) {
-          data.checkNotes[label] = DEFAULT_CHECK_NOTES[label] || "";
-        }
-      });
+      const systemChecks = prepareSystemCheckData(data);
 
       els.quickSystemTitle.textContent = data.type;
       els.quickSystemSubtitle.textContent = `Informe ${appState.current.number}`;
@@ -2034,13 +2115,13 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       els.quickMetaBuilding.value = data.meta.building || "";
       els.quickMetaSystem.value = data.meta.system || data.type;
       els.quickMetaDenomination.value = data.meta.denomination || data.type;
-      els.systemChecks.innerHTML = SYSTEM_CHECKS.map(label => `
+      els.systemChecks.innerHTML = systemChecks.map(label => `
         <label class="check-option">
           <input type="checkbox" data-system-check="${escapeHtml(label)}" ${data.checks[label] ? "checked" : ""}>
           <span>${escapeHtml(label)}</span>
         </label>
       `).join("");
-      els.checkTextContainer.innerHTML = SYSTEM_CHECKS.map((label, index) => `
+      els.checkTextContainer.innerHTML = systemChecks.map((label, index) => `
         <div class="field">
           <label>${index + 1}. ${escapeHtml(label.toUpperCase())}</label>
           <textarea data-check-note="${escapeHtml(label)}" placeholder="Escribe aquí los datos de ${escapeHtml(label.toLowerCase())}">${escapeHtml(data.checkNotes[label] || "")}</textarea>
@@ -2072,7 +2153,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       data.meta.building = els.quickMetaBuilding.value;
       data.meta.system = els.quickMetaSystem.value;
       data.meta.denomination = els.quickMetaDenomination.value;
-      SYSTEM_CHECKS.forEach(label => {
+      getSystemChecks(data.type).forEach(label => {
         const checkbox = els.systemChecks.querySelector(`[data-system-check="${CSS.escape(label)}"]`);
         const note = els.checkTextContainer.querySelector(`[data-check-note="${CSS.escape(label)}"]`);
         data.checks[label] = Boolean(checkbox?.checked);
@@ -2220,8 +2301,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function composeEntryReport(data) {
-      const selectedChecks = SYSTEM_CHECKS.filter(label => data.checks?.[label]);
-      const checkNotesHtml = SYSTEM_CHECKS
+      const systemChecks = prepareSystemCheckData(data);
+      const selectedChecks = systemChecks.filter(label => data.checks?.[label]);
+      const checkNotesHtml = systemChecks
         .filter(label => data.checks?.[label] && (data.checkNotes?.[label] || "").trim())
         .map(label => `<div class="doc-section"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(data.checkNotes[label].trim())}</p></div>`)
         .join("");
@@ -2250,7 +2332,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
       const text = [
         data.type,
-        ...SYSTEM_CHECKS.flatMap(label => {
+        ...systemChecks.flatMap(label => {
           const note = (data.checkNotes?.[label] || "").trim();
           return data.checks?.[label] && note ? [label, note] : [];
         }),
@@ -2896,12 +2978,14 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         return `<div class="reviewed-equipment"><div class="reviewed-equipment-title">${index + 1}. ${escapeHtml(item.meta?.denomination || item.name)}</div>${item.html || ""}</div>`;
       }
 
+      prepareSystemCheckData(data);
+
       const heading = [
         data.meta?.client,
         data.meta?.building,
         data.meta?.denomination || data.meta?.system || data.type
       ].filter(Boolean).join(" - ");
-      const selectedChecks = SYSTEM_CHECKS.filter(label => data.checks?.[label]);
+      const selectedChecks = getSystemChecks(data.type).filter(label => data.checks?.[label]);
       const checkNotesHtml = selectedChecks
         .filter(label => (data.checkNotes?.[label] || "").trim())
         .map(label => `<div class="doc-section"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(data.checkNotes[label].trim())}</p></div>`)
@@ -3249,6 +3333,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     function saveCurrentEntry() {
       buildSystemReport(activeEntryId);
       saveState();
+      if (appState.current.format === "new") {
+        showCurrentReportScreen(`${activeSystem} grabado. Puedes añadir otro sistema.`);
+        return;
+      }
       if (systemReturnScreen === "report") {
         showCurrentReportScreen(`${activeSystem} grabado.`);
         return;
@@ -3335,8 +3423,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       showCurrentReportScreen("Selecciona otro sistema amarillo o vuelve al informe.");
     });
     document.getElementById("saveQuickSystemBtn").addEventListener("click", () => {
-      saveQuickInputs();
-      setStatus(els.quickSystemStatus, `${activeSystem} grabado.`);
+      saveCurrentEntry();
     });
     document.getElementById("viewQuickSystemBtn").addEventListener("click", () => {
       saveQuickInputs();
@@ -3681,7 +3768,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=35", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=38", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

@@ -1143,6 +1143,7 @@
 
     function getSystemChecks(system) {
       if (system === SYSTEMS[3]) return GROUP_PRESSURE_CHECKS;
+      if (system === SYSTEMS[4]) return EXTINCTION_SYSTEM_CHECKS;
       if (system === SYSTEMS[1]) return EXTINCTION_SYSTEM_CHECKS;
       return system === SYSTEMS[2]
         ? [...SYSTEM_CHECKS, ...EXTINCTION_EXTRA_CHECKS]
@@ -1202,7 +1203,16 @@
       "Equipos": ""
     };
 
+    const NETWORK_SYSTEM_CHECK_NOTES = {
+      "Funcionando": `Equipos en estado de funcionamiento. Sistema en buen estado.`,
+      "Con averías": "",
+      "Alarmas": "",
+      "Mal estado": "",
+      "Equipos": ""
+    };
+
     function getDefaultCheckNote(system, label) {
+      if (system === SYSTEMS[4]) return NETWORK_SYSTEM_CHECK_NOTES[label] || "";
       if (system === SYSTEMS[1]) return EXTINCTION_SYSTEM_CHECK_NOTES[label] || "";
       return system === SYSTEMS[3]
         ? GROUP_PRESSURE_CHECK_NOTES[label] || ""
@@ -1213,6 +1223,11 @@
       data.checks = data.checks && typeof data.checks === "object" ? data.checks : {};
       data.checkNotes = data.checkNotes && typeof data.checkNotes === "object" ? data.checkNotes : {};
       const systemChecks = getSystemChecks(data.type);
+      if (data.type === SYSTEMS[4] && data.checkPresetRevision !== "network-system-v1") {
+        data.checks = {};
+        data.checkNotes = {};
+        data.checkPresetRevision = "network-system-v1";
+      }
       if (data.type === SYSTEMS[1] && data.checkPresetRevision !== "extinction-system-v1") {
         data.checks = {};
         data.checkNotes = {};
@@ -3848,7 +3863,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=40", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=41", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

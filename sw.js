@@ -1,4 +1,4 @@
-const CACHE_NAME = "sistemas-app-v38";
+const CACHE_NAME = "sistemas-app-v40";
 const APP_ASSETS = [
   "./",
   "index.html",

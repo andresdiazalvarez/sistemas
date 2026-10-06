@@ -1074,8 +1074,8 @@
   <script>
     const SYSTEMS = [
       "Central de Detección de Incendios",
-      "Central de Extinción de Incendios",
       "Extinción de Incendios",
+      "Central de Extinción de Incendios",
       "Grupo de Presión Contra Incendios",
       "Redes Contra Incendios",
       "Detección de monóxido"
@@ -1114,6 +1114,14 @@
       "Retimbrado"
     ];
 
+    const EXTINCTION_SYSTEM_CHECKS = [
+      "Funcionando",
+      "Con averías",
+      "Alarmas",
+      "Mal estado",
+      "Equipos"
+    ];
+
     const GROUP_PRESSURE_CHECKS = [
       "Funcionando",
       "Con averías",
@@ -1135,6 +1143,7 @@
 
     function getSystemChecks(system) {
       if (system === SYSTEMS[3]) return GROUP_PRESSURE_CHECKS;
+      if (system === SYSTEMS[1]) return EXTINCTION_SYSTEM_CHECKS;
       return system === SYSTEMS[2]
         ? [...SYSTEM_CHECKS, ...EXTINCTION_EXTRA_CHECKS]
         : SYSTEM_CHECKS;
@@ -1142,6 +1151,7 @@
 
     const COMMON_STATE_FIXED_TEXT = "El sistema queda descrito conforme al estado observado.";
     const FIXED_TEXT_REVISION = 2;
+    const SYSTEM_NAME_SWAP_REVISION = 1;
 
     const DEFAULT_CHECK_NOTES = {
       "Funcionando": `Durante la revisión se ha comprobado que la central se encuentra en funcionamiento. El equipo permanece alimentado y presenta indicación normal en el momento de la comprobación. Se han revisado los mandos e indicadores disponibles, verificándose su respuesta durante las maniobras realizadas.`,
@@ -1184,7 +1194,16 @@
       "Caudal / curva de bombas": `Las prestaciones hidráulicas del grupo presentan desviaciones respecto a los valores de referencia de la instalación. Los valores de caudal y presión no mantienen la correspondencia prevista con las características de las bombas o con las condiciones establecidas para el abastecimiento contra incendios.`
     };
 
+    const EXTINCTION_SYSTEM_CHECK_NOTES = {
+      "Funcionando": `Durante la revisión se ha comprobado que el sistema se encuentra en funcionamiento. Se han revisado los mandos e indicadores disponibles, verificándose su respuesta durante las maniobras realizadas.`,
+      "Con averías": `La instalación presenta diferentes averías activas durante la revisión. Las incidencias quedan reflejadas en el sistema.`,
+      "Alarmas": DEFAULT_CHECK_NOTES["Alarmas"],
+      "Mal estado": DEFAULT_CHECK_NOTES["Mal estado"],
+      "Equipos": ""
+    };
+
     function getDefaultCheckNote(system, label) {
+      if (system === SYSTEMS[1]) return EXTINCTION_SYSTEM_CHECK_NOTES[label] || "";
       return system === SYSTEMS[3]
         ? GROUP_PRESSURE_CHECK_NOTES[label] || ""
         : DEFAULT_CHECK_NOTES[label] || "";
@@ -1194,6 +1213,11 @@
       data.checks = data.checks && typeof data.checks === "object" ? data.checks : {};
       data.checkNotes = data.checkNotes && typeof data.checkNotes === "object" ? data.checkNotes : {};
       const systemChecks = getSystemChecks(data.type);
+      if (data.type === SYSTEMS[1] && data.checkPresetRevision !== "extinction-system-v1") {
+        data.checks = {};
+        data.checkNotes = {};
+        data.checkPresetRevision = "extinction-system-v1";
+      }
       if (data.type === SYSTEMS[3] && data.checkPresetRevision !== "group-pressure-v1") {
         data.checks = {};
         data.checkNotes = {};
@@ -1347,6 +1371,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         notes: ""
       },
       fixedTextRevision: FIXED_TEXT_REVISION,
+      systemNameSwapRevision: SYSTEM_NAME_SWAP_REVISION,
       fixedTexts: cloneData(DEFAULT_FIXED_TEXTS),
       listing: emptyListing(),
       savedReports: []
@@ -1456,9 +1481,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       state.current.revisionText = (state.current.revisionText || "TRIMESTRAL").toUpperCase();
       state.current.systems = state.current.systems || {};
       state.current.entries = Array.isArray(state.current.entries) ? state.current.entries : entriesFromSystems(state.current.systems);
-      state.current.entries = sortBySystemOrder(state.current.entries);
       state.current.editingId = state.current.editingId || null;
       state.current.notes = state.current.notes || "";
+      applySystemNameSwapRevision(state);
+      state.current.entries = sortBySystemOrder(state.current.entries);
       state.fixedTexts = mergeDefaultFixedTexts(state.fixedTexts || {});
       state.listing = normalizeListing(state.listing);
       state.savedReports = Array.isArray(state.savedReports) ? state.savedReports : [];
@@ -1467,6 +1493,60 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       });
       applyFixedTextRevision(state);
       return state;
+    }
+
+    function applySystemNameSwapRevision(state) {
+      if (Number(state.systemNameSwapRevision || 0) >= SYSTEM_NAME_SWAP_REVISION) return;
+
+      const legacyCentral = "Central de Extinción de Incendios";
+      const legacyExtinction = "Extinción de Incendios";
+      const swapName = value => {
+        if (value === legacyCentral) return legacyExtinction;
+        if (value === legacyExtinction) return legacyCentral;
+        return value;
+      };
+      const updateEntry = entry => {
+        if (!entry || typeof entry !== "object") return;
+        entry.type = swapName(entry.type);
+        entry.meta = entry.meta || {};
+        entry.meta.system = swapName(entry.meta.system);
+        entry.meta.denomination = swapName(entry.meta.denomination);
+        entry.mountedHtml = "";
+        entry.mountedText = "";
+      };
+      const swapSystemObjectKeys = source => {
+        if (!source || typeof source !== "object") return source || {};
+        const centralValue = source[legacyCentral];
+        const extinctionValue = source[legacyExtinction];
+        if (centralValue !== undefined) source[legacyExtinction] = centralValue;
+        else delete source[legacyExtinction];
+        if (extinctionValue !== undefined) source[legacyCentral] = extinctionValue;
+        else delete source[legacyCentral];
+        return source;
+      };
+
+      state.current.systems = swapSystemObjectKeys(state.current.systems);
+      (state.current.entries || []).forEach(updateEntry);
+      (state.savedReports || []).forEach(report => {
+        (report.systems || []).forEach(system => {
+          system.name = swapName(system.name);
+          if (system.meta) {
+            system.meta.system = swapName(system.meta.system);
+            system.meta.denomination = swapName(system.meta.denomination);
+          }
+        });
+        report.sourceSystems = swapSystemObjectKeys(report.sourceSystems);
+        (report.sourceEntries || []).forEach(updateEntry);
+      });
+
+      state.fixedTexts = state.fixedTexts || {};
+      const centralTexts = state.fixedTexts[legacyCentral];
+      const extinctionTexts = state.fixedTexts[legacyExtinction];
+      if (centralTexts !== undefined) state.fixedTexts[legacyExtinction] = centralTexts;
+      else delete state.fixedTexts[legacyExtinction];
+      if (extinctionTexts !== undefined) state.fixedTexts[legacyCentral] = extinctionTexts;
+      else delete state.fixedTexts[legacyCentral];
+      state.systemNameSwapRevision = SYSTEM_NAME_SWAP_REVISION;
     }
 
     function applyFixedTextRevision(state) {
@@ -3768,7 +3848,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=38", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=40", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

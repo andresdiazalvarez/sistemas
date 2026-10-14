@@ -813,9 +813,9 @@
           </div>
           <div class="button-row">
             <button id="downloadAllPdfBtn" class="btn green" type="button">Descargar todo en PDF</button>
-            <button id="exportCurrentWorkBtn" class="btn green" type="button">Exportar trabajo a Excel</button>
+            <button id="exportCurrentWorkBtn" class="btn green" type="button">Descargar trabajo en PDF</button>
             <label class="btn blue" for="mergeCurrentWorkFiles">Unir trabajos de otros móviles</label>
-            <input id="mergeCurrentWorkFiles" class="hidden-input" type="file" accept=".xlsx" multiple>
+            <input id="mergeCurrentWorkFiles" class="hidden-input" type="file" accept="application/pdf,.pdf" multiple>
             <button id="deleteCurrentBtn" class="btn red" type="button">Borrar informe actual</button>
           </div>
         </div>
@@ -887,9 +887,9 @@
           <button id="viewReportDetailBtn" class="btn violet" type="button">Ver conjunto</button>
           <button id="downloadReportDetailPdfBtn" class="btn green" type="button">Descargar PDF</button>
           <button id="downloadReportDetailWordBtn" class="btn blue" type="button">Cabeceras</button>
-          <button id="exportReportWorkBtn" class="btn green" type="button">Exportar trabajo a Excel</button>
+          <button id="exportReportWorkBtn" class="btn green" type="button">Descargar trabajo en PDF</button>
           <label class="btn blue" for="mergeReportWorkFiles">Unir trabajos de otros móviles</label>
-          <input id="mergeReportWorkFiles" class="hidden-input" type="file" accept=".xlsx" multiple>
+          <input id="mergeReportWorkFiles" class="hidden-input" type="file" accept="application/pdf,.pdf" multiple>
         </div>
 
         <div class="field">
@@ -2482,6 +2482,141 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       return String(value || "informe").trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-").slice(0, 90) || "informe";
     }
 
+    const REPORT_PDF_DATA_MARKER = "\n%%SYCO_SISTEMAS_TRABAJO_V1%%\n";
+
+    function makeReportPdfPayload(report = appState.current, entries = appState.current.entries) {
+      return {
+        application: "SISTEMAS",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        report: {
+          header: report.header || "",
+          revisionNumber: report.revisionNumber || "",
+          revisionText: report.revisionText || "",
+          notes: report.notes || "",
+          format: report.format || appState.current.format || "new",
+          entries: cloneData(entries || report.sourceEntries || [])
+        }
+      };
+    }
+
+    async function exportCurrentReportWorkPdf() {
+      const status = els.newReportScreen.classList.contains("active") ? els.homeStatus : els.reportStatus;
+      syncReportDetailFields();
+      const entries = sortBySystemOrder(appState.current.entries);
+      if (!entries.length) {
+        setStatus(status, "No hay sistemas preparados para exportar.", true);
+        return;
+      }
+      const snapshot = makeCurrentReportSnapshot();
+      const name = safeFileName(appState.current.header || `informe-${appState.current.number}`);
+      await downloadPdfFromHtml(buildFullHtml(snapshot), `${name}-trabajo.pdf`, makeReportPdfPayload(appState.current, entries));
+      setStatus(status, "PDF de trabajo descargado con todos los sistemas, datos y fotografías.");
+    }
+
+    function readReportPdfPayload(buffer) {
+      const bytes = new Uint8Array(buffer);
+      const marker = new TextEncoder().encode(REPORT_PDF_DATA_MARKER);
+      const markerIndex = lastIndexOfBytes(bytes, marker);
+      if (markerIndex < 0) return null;
+      try {
+        return JSON.parse(new TextDecoder().decode(bytes.slice(markerIndex + marker.length)));
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function lastIndexOfBytes(source, target) {
+      for (let index = source.length - target.length; index >= 0; index -= 1) {
+        let matches = true;
+        for (let offset = 0; offset < target.length; offset += 1) {
+          if (source[index + offset] !== target[offset]) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) return index;
+      }
+      return -1;
+    }
+
+    function normalizeReportPdfEntry(raw) {
+      if (!raw || typeof raw !== "object") return null;
+      const entry = cloneData(raw);
+      entry.id = makeId();
+      entry.type = SYSTEMS.includes(entry.type) ? entry.type : SYSTEMS[0];
+      entry.meta = entry.meta || {};
+      entry.checks = entry.checks || {};
+      entry.checkNotes = entry.checkNotes || {};
+      entry.sections = entry.sections || {};
+      SECTIONS.forEach(section => {
+        entry.sections[section] = { ...emptySection(), ...(entry.sections[section] || {}) };
+      });
+      entry.photos = (entry.photos || []).filter(Boolean);
+      entry.chatGptPrompt = entry.chatGptPrompt || "";
+      entry.chatGptResult = entry.chatGptResult || "";
+      entry.mountedHtml = "";
+      entry.mountedText = "";
+      return entry;
+    }
+
+    async function mergeReportWorkPdfFiles(event) {
+      const files = Array.from(event.target.files || []);
+      if (!files.length) return;
+      let added = 0;
+      let combined = 0;
+      let matches = 0;
+      let incompatible = 0;
+      try {
+        syncReportDetailFields();
+        const bySyco = new Map();
+        appState.current.entries.forEach(entry => {
+          const key = normalizeSyco(entry.meta?.syco);
+          if (key && !bySyco.has(key)) bySyco.set(key, entry);
+        });
+
+        for (const file of files) {
+          const payload = readReportPdfPayload(await file.arrayBuffer());
+          const importedInfo = payload?.application === "SISTEMAS" ? payload.report : null;
+          if (!importedInfo || !sameReportProject(appState.current, importedInfo)) {
+            incompatible += 1;
+            continue;
+          }
+          adoptEmptyReportInfo(importedInfo);
+          const importedEntries = (importedInfo.entries || []).map(normalizeReportPdfEntry).filter(Boolean);
+          importedEntries.forEach(incoming => {
+            const key = normalizeSyco(incoming.meta?.syco);
+            const existing = key ? bySyco.get(key) : null;
+            if (!existing) {
+              appState.current.entries.push(incoming);
+              if (key) bySyco.set(key, incoming);
+              added += 1;
+              return;
+            }
+            matches += 1;
+            if (mergeReportEntry(existing, incoming)) combined += 1;
+          });
+        }
+
+        sortCurrentEntries();
+        if (!saveState()) throw new Error("No se pudo guardar la unión con todas las fotografías.");
+        const message = `${added} equipo(s) añadido(s), ${combined} combinado(s), ${matches} coincidencia(s) y ${incompatible} PDF incompatible(s) u otro proyecto omitido(s).`;
+        if (els.newReportScreen.classList.contains("active")) {
+          renderHome();
+          showScreen("newReportScreen");
+          setStatus(els.homeStatus, message);
+        } else {
+          renderReportScreen();
+          setStatus(els.reportStatus, message);
+        }
+      } catch (error) {
+        const status = els.newReportScreen.classList.contains("active") ? els.homeStatus : els.reportStatus;
+        setStatus(status, error.message || "No se pudieron unir los PDF de trabajo.", true);
+      } finally {
+        event.target.value = "";
+      }
+    }
+
     function syncReportDetailFields() {
       if (els.newReportScreen.classList.contains("active")) {
         appState.current.header = (els.reportHeader.value || "").toUpperCase();
@@ -3749,7 +3884,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       doc.save(filename);
     }
 
-    async function downloadPdfFromHtml(html, filename) {
+    async function downloadPdfFromHtml(html, filename, embeddedPayload = null) {
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ unit: "pt", format: "a4" });
       const pageState = { count: 0 };
@@ -3778,7 +3913,14 @@ ${item.voice.trim() || "Sin texto aportado."}`;
           await addElementToPdf(pdf, renderHost, pageState);
         }
         if (!pageState.count) addBlankPdfPage(pdf, pageState);
-        pdf.save(filename);
+        if (embeddedPayload) {
+          const pdfBytes = new Uint8Array(pdf.output("arraybuffer"));
+          const markerBytes = new TextEncoder().encode(REPORT_PDF_DATA_MARKER);
+          const payloadBytes = new TextEncoder().encode(JSON.stringify(embeddedPayload));
+          downloadBlob([pdfBytes, markerBytes, payloadBytes], "application/pdf", filename);
+        } else {
+          pdf.save(filename);
+        }
       } finally {
         renderHost.remove();
       }
@@ -4062,13 +4204,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         setStatus(els.reportStatus, "No hay sistemas para descargar.", true);
         return;
       }
-      await downloadPdfFromHtml(buildFullHtml(report), `informe-${appState.current.number}.pdf`);
+      await downloadPdfFromHtml(buildFullHtml(report), `informe-${appState.current.number}.pdf`, makeReportPdfPayload(appState.current, appState.current.entries));
     });
     document.getElementById("downloadReportDetailWordBtn").addEventListener("click", () => {
       showWordTextScreen();
     });
-    document.getElementById("exportReportWorkBtn").addEventListener("click", exportCurrentReportWorkExcel);
-    document.getElementById("mergeReportWorkFiles").addEventListener("change", mergeReportWorkFiles);
+    document.getElementById("exportReportWorkBtn").addEventListener("click", exportCurrentReportWorkPdf);
+    document.getElementById("mergeReportWorkFiles").addEventListener("change", mergeReportWorkPdfFiles);
     document.getElementById("backFromWordTextBtn").addEventListener("click", () => {
       showCurrentReportScreen();
     });
@@ -4144,10 +4286,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     document.getElementById("downloadMountedPdfBtn").addEventListener("click", async () => {
       if (previewMode === "entry") {
         const report = buildSystemReport(activeEntryId);
-        await downloadPdfFromHtml(`<div class="doc">${report.html}</div>`, `informe-${appState.current.number}-${activeSystem}.pdf`);
+        const entry = ensureEntry(activeEntryId);
+        await downloadPdfFromHtml(`<div class="doc">${report.html}</div>`, `informe-${appState.current.number}-${activeSystem}.pdf`, makeReportPdfPayload(appState.current, [entry]));
       } else {
         const report = makeCurrentReportSnapshot();
-        await downloadPdfFromHtml(buildFullHtml(report), `informe-${appState.current.number}.pdf`);
+        await downloadPdfFromHtml(buildFullHtml(report), `informe-${appState.current.number}.pdf`, makeReportPdfPayload(appState.current, appState.current.entries));
       }
     });
     document.getElementById("clearMountedBtn").addEventListener("click", clearCurrentReport);
@@ -4160,8 +4303,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
       await downloadPdfFromHtml(html, "informes-sistemas.pdf");
     });
-    document.getElementById("exportCurrentWorkBtn").addEventListener("click", exportCurrentReportWorkExcel);
-    document.getElementById("mergeCurrentWorkFiles").addEventListener("change", mergeReportWorkFiles);
+    document.getElementById("exportCurrentWorkBtn").addEventListener("click", exportCurrentReportWorkPdf);
+    document.getElementById("mergeCurrentWorkFiles").addEventListener("change", mergeReportWorkPdfFiles);
     els.reportHeader.addEventListener("input", () => {
       appState.current.header = els.reportHeader.value.toUpperCase();
       els.reportHeader.value = appState.current.header;
@@ -4337,7 +4480,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         downloadWord(buildFullHtml(report), `informe-${report.number}.doc`);
       }
       if (button.dataset.action === "pdf") {
-        downloadPdfFromHtml(buildFullHtml(report), `informe-${report.number}.pdf`);
+        downloadPdfFromHtml(buildFullHtml(report), `informe-${report.number}.pdf`, makeReportPdfPayload(report, report.sourceEntries || []));
       }
     });
 
@@ -4454,7 +4597,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=43", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=44", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

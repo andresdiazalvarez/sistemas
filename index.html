@@ -2567,6 +2567,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       let combined = 0;
       let matches = 0;
       let incompatible = 0;
+      let differentHeader = 0;
       try {
         syncReportDetailFields();
         const bySyco = new Map();
@@ -2578,11 +2579,13 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         for (const file of files) {
           const payload = readReportPdfPayload(await file.arrayBuffer());
           const importedInfo = payload?.application === "SISTEMAS" ? payload.report : null;
-          if (!importedInfo || !sameReportProject(appState.current, importedInfo)) {
+          if (!importedInfo) {
             incompatible += 1;
             continue;
           }
-          adoptEmptyReportInfo(importedInfo);
+          const sameProject = sameReportProject(appState.current, importedInfo);
+          if (sameProject) adoptEmptyReportInfo(importedInfo);
+          else differentHeader += 1;
           const importedEntries = (importedInfo.entries || []).map(normalizeReportPdfEntry).filter(Boolean);
           importedEntries.forEach(incoming => {
             const key = normalizeSyco(incoming.meta?.syco);
@@ -2600,7 +2603,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
         sortCurrentEntries();
         if (!saveState()) throw new Error("No se pudo guardar la unión con todas las fotografías.");
-        const message = `${added} equipo(s) añadido(s), ${combined} combinado(s), ${matches} coincidencia(s) y ${incompatible} PDF incompatible(s) u otro proyecto omitido(s).`;
+        const headerNotice = differentHeader ? ` ${differentHeader} PDF tenía una cabecera o revisión distinta y se integró en el informe abierto.` : "";
+        const message = `${added} equipo(s) añadido(s), ${combined} combinado(s), ${matches} coincidencia(s) y ${incompatible} PDF incompatible(s).${headerNotice}`;
         if (els.newReportScreen.classList.contains("active")) {
           renderHome();
           showScreen("newReportScreen");
@@ -4598,7 +4602,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=45", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=46", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

@@ -4107,7 +4107,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     function downloadBlob(bytes, type, filename) {
-      const blob = new Blob([bytes], { type });
+      const parts = Array.isArray(bytes) ? bytes : [bytes];
+      const blob = new Blob(parts, { type });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -4597,7 +4598,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=44", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=45", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

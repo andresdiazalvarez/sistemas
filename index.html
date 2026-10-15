@@ -785,7 +785,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 49</span>
+            <span class="app-version">VERSIÓN 50</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -2989,6 +2989,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function saveQuickInputs() {
+      if (!els.quickSystemScreen.classList.contains("active")) return;
       if (!activeEntryId) return;
       const data = ensureEntry(activeEntryId);
       data.meta.syco = els.quickMetaSyco.value;
@@ -3046,6 +3047,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function saveSystemInputs() {
+      if (!els.systemScreen.classList.contains("active")) return;
       if (!activeEntryId) return;
       const data = ensureEntry(activeEntryId);
       data.meta.syco = els.metaSyco.value;
@@ -4449,6 +4451,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         const entry = appState.current.entries.find(item => item.id === removeButton.dataset.removeEntry);
         if (!window.confirm(`¿Quieres quitar definitivamente ${entry?.type || "este sistema"} del informe?`)) return;
         appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
+        if (activeEntryId === removeButton.dataset.removeEntry) {
+          activeEntryId = "";
+          activeSystem = "";
+        }
         saveState();
         renderHome();
       }
@@ -4471,6 +4477,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         const entry = appState.current.entries.find(item => item.id === removeButton.dataset.removeEntry);
         if (!window.confirm(`¿Quieres quitar definitivamente ${entry?.type || "este sistema"} del informe?`)) return;
         appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
+        if (activeEntryId === removeButton.dataset.removeEntry) {
+          activeEntryId = "";
+          activeSystem = "";
+        }
         saveState();
         renderReportScreen();
       }
@@ -4631,13 +4641,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v49";
+        const reloadKey = "sistemas-sw-reload-v50";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=49", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=50", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

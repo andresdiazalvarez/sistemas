@@ -532,6 +532,7 @@
     }
 
     .photo-preview {
+      position: relative;
       width: 100%;
       aspect-ratio: 4 / 3;
       border-radius: 6px;
@@ -544,6 +545,15 @@
       margin-bottom: 8px;
       font-size: .9rem;
       text-align: center;
+      cursor: pointer;
+    }
+
+    .photo-preview-input {
+      position: absolute;
+      width: 1px !important;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
     }
 
     .photo-preview img {
@@ -785,7 +795,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 50</span>
+            <span class="app-version">VERSIÓN 51</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -965,6 +975,9 @@
           </div>
         </div>
 
+        <h2>Imágenes</h2>
+        <div id="photoContainer" class="photos"></div>
+
         <div id="sectionContainer"></div>
 
         <div class="section-block">
@@ -989,9 +1002,6 @@
             <button id="applyChatGptResultBtn" class="btn pink" type="button">Aplicar texto al informe</button>
           </div>
         </div>
-
-        <h2>Imágenes</h2>
-        <div id="photoContainer" class="photos"></div>
 
         <div class="button-row" style="margin-top: 18px;">
           <button id="saveEntryBtn" class="btn green" type="button">Grabar</button>
@@ -1040,13 +1050,13 @@
           <div id="systemChecks" class="check-grid"></div>
         </div>
 
+        <h2>Imágenes</h2>
+        <div id="quickPhotoContainer" class="photos"></div>
+
         <div class="section-block">
           <div class="section-title">Textos del estado</div>
           <div id="checkTextContainer" class="check-text-grid"></div>
         </div>
-
-        <h2>Imágenes</h2>
-        <div id="quickPhotoContainer" class="photos"></div>
 
         <div class="button-row" style="margin-top: 18px;">
           <button id="saveQuickSystemBtn" class="btn green" type="button">Grabar</button>
@@ -2926,7 +2936,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
       els.photoContainer.innerHTML = data.photos.map((photo, index) => `
         <div class="photo-slot">
-          <div class="photo-preview">${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}`}</div>
+          <label class="photo-preview" title="Pulsar para elegir imagen o hacer una foto">
+            ${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}<br><strong>Pulsar para añadir</strong>`}
+            <input class="photo-preview-input" type="file" accept="image/*" data-photo="${index}">
+          </label>
           <div class="photo-inputs">
             <label>Buscar imagen
               <input type="file" accept="image/*" data-photo="${index}">
@@ -2971,7 +2984,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       `).join("");
       els.quickPhotoContainer.innerHTML = data.photos.map((photo, index) => `
         <div class="photo-slot">
-          <div class="photo-preview">${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}`}</div>
+          <label class="photo-preview" title="Pulsar para elegir imagen o hacer una foto">
+            ${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}<br><strong>Pulsar para añadir</strong>`}
+            <input class="photo-preview-input" type="file" accept="image/*" data-photo="${index}">
+          </label>
           <div class="photo-inputs">
             <label>Buscar imagen
               <input type="file" accept="image/*" data-photo="${index}">
@@ -4641,13 +4657,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v50";
+        const reloadKey = "sistemas-sw-reload-v51";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=50", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=51", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

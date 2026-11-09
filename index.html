@@ -577,6 +577,33 @@
     .photo-slot input { width: 100%; }
     .photo-slot .btn { width: 100%; }
 
+    .camera-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
+      padding: 18px;
+      background: #111;
+    }
+
+    .camera-modal[hidden] { display: none; }
+
+    .camera-modal video {
+      width: 100%;
+      max-height: calc(100vh - 120px);
+      object-fit: contain;
+      background: #000;
+    }
+
+    .camera-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
     .preview-shell {
       background: #fff;
       border: 1px solid var(--line);
@@ -795,7 +822,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 51</span>
+            <span class="app-version">VERSIÓN 53</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -1105,6 +1132,14 @@
       </div>
     </section>
   </main>
+
+  <div id="cameraModal" class="camera-modal" hidden>
+    <video id="cameraVideo" autoplay playsinline muted></video>
+    <div class="camera-actions">
+      <button id="takeDirectPhotoBtn" class="btn green" type="button">Hacer foto</button>
+      <button id="cancelDirectPhotoBtn" class="btn red" type="button">Cancelar</button>
+    </div>
+  </div>
 
   <script>
     const SYSTEMS = [
@@ -1436,6 +1471,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     let reportReturnScreen = "homeScreen";
     let activeRecognition = null;
     let deferredInstallPrompt = null;
+    let directCameraState = null;
 
     const els = {
       homeScreen: document.getElementById("homeScreen"),
@@ -1446,6 +1482,10 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       quickSystemScreen: document.getElementById("quickSystemScreen"),
       wordTextScreen: document.getElementById("wordTextScreen"),
       previewScreen: document.getElementById("previewScreen"),
+      cameraModal: document.getElementById("cameraModal"),
+      cameraVideo: document.getElementById("cameraVideo"),
+      takeDirectPhotoBtn: document.getElementById("takeDirectPhotoBtn"),
+      cancelDirectPhotoBtn: document.getElementById("cancelDirectPhotoBtn"),
       currentReportNumber: document.getElementById("currentReportNumber"),
       reportHeader: document.getElementById("reportHeader"),
       revisionNumber: document.getElementById("revisionNumber"),
@@ -2936,10 +2976,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
 
       els.photoContainer.innerHTML = data.photos.map((photo, index) => `
         <div class="photo-slot">
-          <label class="photo-preview" title="Pulsar para elegir imagen o hacer una foto">
+          <button class="photo-preview" type="button" data-direct-camera="${index}" title="Pulsar para abrir la cámara">
             ${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}<br><strong>Pulsar para añadir</strong>`}
-            <input class="photo-preview-input" type="file" accept="image/*" data-photo="${index}">
-          </label>
+          </button>
           <div class="photo-inputs">
             <label>Buscar imagen
               <input type="file" accept="image/*" data-photo="${index}">
@@ -2984,10 +3023,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       `).join("");
       els.quickPhotoContainer.innerHTML = data.photos.map((photo, index) => `
         <div class="photo-slot">
-          <label class="photo-preview" title="Pulsar para elegir imagen o hacer una foto">
+          <button class="photo-preview" type="button" data-direct-camera="${index}" title="Pulsar para abrir la cámara">
             ${photo ? `<img src="${photo}" alt="Imagen ${index + 1}">` : `Imagen ${index + 1}<br><strong>Pulsar para añadir</strong>`}
-            <input class="photo-preview-input" type="file" accept="image/*" data-photo="${index}">
-          </label>
+          </button>
           <div class="photo-inputs">
             <label>Buscar imagen
               <input type="file" accept="image/*" data-photo="${index}">
@@ -3148,6 +3186,71 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
         };
         img.src = url;
       });
+    }
+
+    async function openDirectCamera(index, mode) {
+      const data = ensureEntry(activeEntryId);
+      if (data.photos[index] && !window.confirm(`La foto ${index + 1} ya existe. ¿Quieres sustituirla por una nueva?`)) return;
+
+      const container = mode === "quick" ? els.quickPhotoContainer : els.photoContainer;
+      const fallback = container.querySelector(`input[capture][data-photo="${index}"]`);
+      if (!navigator.mediaDevices?.getUserMedia) {
+        fallback?.click();
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+        directCameraState = { index, mode, stream };
+        els.cameraVideo.srcObject = stream;
+        els.cameraModal.hidden = false;
+        await els.cameraVideo.play();
+      } catch (error) {
+        closeDirectCamera();
+        fallback?.click();
+      }
+    }
+
+    function closeDirectCamera() {
+      if (directCameraState?.stream) {
+        directCameraState.stream.getTracks().forEach(track => track.stop());
+      }
+      directCameraState = null;
+      els.cameraVideo.srcObject = null;
+      els.cameraModal.hidden = true;
+    }
+
+    function takeDirectPhoto() {
+      if (!directCameraState || !els.cameraVideo.videoWidth || !els.cameraVideo.videoHeight) return;
+      const { index, mode } = directCameraState;
+      const maxSide = 1280;
+      const scale = Math.min(1, maxSide / Math.max(els.cameraVideo.videoWidth, els.cameraVideo.videoHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(els.cameraVideo.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(els.cameraVideo.videoHeight * scale));
+      canvas.getContext("2d").drawImage(els.cameraVideo, 0, 0, canvas.width, canvas.height);
+      const photo = canvas.toDataURL("image/jpeg", 0.72);
+      closeDirectCamera();
+
+      const data = ensureEntry(activeEntryId);
+      const previous = data.photos[index];
+      data.photos[index] = photo;
+      data.mountedHtml = "";
+      data.mountedText = "";
+      if (!saveState()) {
+        data.photos[index] = previous;
+        return;
+      }
+      if (mode === "quick") {
+        renderQuickEntry(activeEntryId, { keepScroll: true });
+        els.quickPhotoContainer.scrollIntoView({ block: "start" });
+      } else {
+        renderEntry(activeEntryId, { keepScroll: true });
+        els.photoContainer.scrollIntoView({ block: "start" });
+      }
     }
 
     function buildSystemReport(entryId) {
@@ -4591,6 +4694,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
 
     els.photoContainer.addEventListener("click", event => {
+      const cameraButton = event.target.closest("[data-direct-camera]");
+      if (cameraButton) {
+        openDirectCamera(Number(cameraButton.dataset.directCamera), "old");
+        return;
+      }
       const button = event.target.closest("[data-delete-photo]");
       if (!button) return;
       const data = ensureEntry(activeEntryId);
@@ -4630,6 +4738,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
 
     els.quickPhotoContainer.addEventListener("click", event => {
+      const cameraButton = event.target.closest("[data-direct-camera]");
+      if (cameraButton) {
+        openDirectCamera(Number(cameraButton.dataset.directCamera), "quick");
+        return;
+      }
       const button = event.target.closest("[data-delete-photo]");
       if (!button) return;
       const data = ensureEntry(activeEntryId);
@@ -4644,6 +4757,9 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       els.quickPhotoContainer.scrollIntoView({ block: "start" });
     });
 
+    els.takeDirectPhotoBtn.addEventListener("click", takeDirectPhoto);
+    els.cancelDirectPhotoBtn.addEventListener("click", closeDirectCamera);
+
     window.addEventListener("beforeinstallprompt", event => {
       event.preventDefault();
       deferredInstallPrompt = event;
@@ -4657,13 +4773,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v51";
+        const reloadKey = "sistemas-sw-reload-v53";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=51", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=53", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

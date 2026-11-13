@@ -604,6 +604,92 @@
       gap: 12px;
     }
 
+    .delete-confirm-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 11000;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, .72);
+    }
+
+    .delete-confirm-modal[hidden] { display: none; }
+
+    .delete-confirm-box {
+      width: min(560px, 100%);
+      padding: 24px;
+      border: 5px solid var(--red);
+      border-radius: 8px;
+      background: #ffed00;
+      color: #111;
+      box-shadow: 0 18px 55px rgba(0, 0, 0, .48);
+      text-align: center;
+    }
+
+    .delete-confirm-box h2 {
+      margin: 0 0 14px;
+      color: var(--red);
+      font-size: clamp(1.7rem, 6vw, 2.6rem);
+    }
+
+    .delete-confirm-box p {
+      margin: 0 0 22px;
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .delete-confirm-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .save-confirm-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10900;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, .72);
+    }
+
+    .save-confirm-modal[hidden] { display: none; }
+
+    .save-confirm-box {
+      width: min(620px, 100%);
+      padding: 24px;
+      border: 5px solid #159447;
+      border-radius: 8px;
+      background: #ffed00;
+      color: #111;
+      box-shadow: 0 18px 55px rgba(0, 0, 0, .48);
+      text-align: center;
+    }
+
+    .save-confirm-box h2 {
+      margin: 0 0 14px;
+      font-size: clamp(1.6rem, 6vw, 2.4rem);
+    }
+
+    .save-confirm-box p {
+      margin: 0 0 22px;
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+
+    .save-confirm-actions {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    @media (max-width: 560px) {
+      .save-confirm-actions { grid-template-columns: 1fr; }
+    }
+
     .preview-shell {
       background: #fff;
       border: 1px solid var(--line);
@@ -822,7 +908,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 53</span>
+            <span class="app-version">VERSIÓN 55</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -1138,6 +1224,29 @@
     <div class="camera-actions">
       <button id="takeDirectPhotoBtn" class="btn green" type="button">Hacer foto</button>
       <button id="cancelDirectPhotoBtn" class="btn red" type="button">Cancelar</button>
+    </div>
+  </div>
+
+  <div id="deleteConfirmModal" class="delete-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle" hidden>
+    <div class="delete-confirm-box">
+      <h2 id="deleteConfirmTitle">ATENCIÓN</h2>
+      <p id="deleteConfirmMessage"></p>
+      <div class="delete-confirm-actions">
+        <button id="confirmDeleteBtn" class="btn red" type="button">SÍ, ELIMINAR</button>
+        <button id="cancelDeleteBtn" class="btn" type="button">CANCELAR</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="saveConfirmModal" class="save-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="saveConfirmTitle" hidden>
+    <div class="save-confirm-box">
+      <h2 id="saveConfirmTitle">¿QUIERES GRABAR?</h2>
+      <p>Antes de volver, puedes grabar los cambios para no perder el trabajo.</p>
+      <div class="save-confirm-actions">
+        <button id="saveAndBackBtn" class="btn green" type="button">GRABAR Y VOLVER</button>
+        <button id="backWithoutSaveBtn" class="btn red" type="button">VOLVER SIN GRABAR</button>
+        <button id="cancelBackBtn" class="btn" type="button">CANCELAR</button>
+      </div>
     </div>
   </div>
 
@@ -1472,6 +1581,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     let activeRecognition = null;
     let deferredInstallPrompt = null;
     let directCameraState = null;
+    let deleteConfirmResolver = null;
+    let saveConfirmResolver = null;
 
     const els = {
       homeScreen: document.getElementById("homeScreen"),
@@ -1486,6 +1597,14 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       cameraVideo: document.getElementById("cameraVideo"),
       takeDirectPhotoBtn: document.getElementById("takeDirectPhotoBtn"),
       cancelDirectPhotoBtn: document.getElementById("cancelDirectPhotoBtn"),
+      deleteConfirmModal: document.getElementById("deleteConfirmModal"),
+      deleteConfirmMessage: document.getElementById("deleteConfirmMessage"),
+      confirmDeleteBtn: document.getElementById("confirmDeleteBtn"),
+      cancelDeleteBtn: document.getElementById("cancelDeleteBtn"),
+      saveConfirmModal: document.getElementById("saveConfirmModal"),
+      saveAndBackBtn: document.getElementById("saveAndBackBtn"),
+      backWithoutSaveBtn: document.getElementById("backWithoutSaveBtn"),
+      cancelBackBtn: document.getElementById("cancelBackBtn"),
       currentReportNumber: document.getElementById("currentReportNumber"),
       reportHeader: document.getElementById("reportHeader"),
       revisionNumber: document.getElementById("revisionNumber"),
@@ -1848,6 +1967,39 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     function setStatus(el, message, isError = false) {
       el.textContent = message;
       el.classList.toggle("error", isError);
+    }
+
+    function confirmDeletion(message) {
+      if (deleteConfirmResolver) deleteConfirmResolver(false);
+      els.deleteConfirmMessage.textContent = message;
+      els.deleteConfirmModal.hidden = false;
+      els.confirmDeleteBtn.focus();
+      return new Promise(resolve => {
+        deleteConfirmResolver = resolve;
+      });
+    }
+
+    function finishDeleteConfirmation(confirmed) {
+      els.deleteConfirmModal.hidden = true;
+      const resolve = deleteConfirmResolver;
+      deleteConfirmResolver = null;
+      if (resolve) resolve(confirmed);
+    }
+
+    function confirmSaveBeforeBack() {
+      if (saveConfirmResolver) saveConfirmResolver("cancel");
+      els.saveConfirmModal.hidden = false;
+      els.saveAndBackBtn.focus();
+      return new Promise(resolve => {
+        saveConfirmResolver = resolve;
+      });
+    }
+
+    function finishSaveConfirmation(choice) {
+      els.saveConfirmModal.hidden = true;
+      const resolve = saveConfirmResolver;
+      saveConfirmResolver = null;
+      if (resolve) resolve(choice);
     }
 
     function escapeHtml(value) {
@@ -2909,9 +3061,9 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
       return changed;
     }
 
-    function deleteListingExcel() {
+    async function deleteListingExcel() {
       if (!appState.listing?.rows?.length && !appState.listing?.fileData) return;
-      if (!window.confirm("¿Quieres eliminar completamente el listado cargado?")) return;
+      if (!await confirmDeletion("¿Quieres eliminar completamente el listado cargado?")) return;
       appState.listing = emptyListing();
       saveState();
       renderListing();
@@ -3568,10 +3720,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       showCurrentReportScreen("Informe grabado.");
     }
 
-    function deleteCurrentSavedReport() {
+    async function deleteCurrentSavedReport() {
       if (!appState.current.editingId) return;
       const deletedNumber = appState.current.number;
-      if (!window.confirm(`¿Quieres eliminar definitivamente el Informe ${deletedNumber}?`)) return;
+      if (!await confirmDeletion(`¿Quieres eliminar definitivamente el Informe ${deletedNumber}?`)) return;
       appState.savedReports = appState.savedReports.filter(report => report.id !== appState.current.editingId);
       appState.nextNumber = getNextReportNumber();
       appState.current = {
@@ -3795,11 +3947,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       showCurrentReportScreen("Selecciona un sistema amarillo para comenzar el informe.", "homeScreen");
     }
 
-    function clearCurrentReport() {
+    async function clearCurrentReport() {
       const message = appState.current.editingId
         ? `¿Quieres eliminar definitivamente el Informe ${appState.current.number} completo?`
         : "¿Quieres borrar todos los datos del informe que estás preparando?";
-      if (!window.confirm(message)) return;
+      if (!await confirmDeletion(message)) return;
 
       if (appState.current.editingId) {
         const deleted = appState.savedReports.find(report => report.id === appState.current.editingId);
@@ -3842,7 +3994,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     }
 
     async function clearAppData() {
-      const ok = window.confirm("¿Quieres eliminar definitivamente TODOS los informes, sistemas, listados, textos y fotos guardados en SISTEMAS?");
+      const ok = await confirmDeletion("¿Quieres eliminar definitivamente TODOS los informes, sistemas, listados, textos y fotos guardados en SISTEMAS?");
       if (!ok) return;
       localStorage.removeItem(STORAGE_KEY);
       await clearStateFromDb();
@@ -4336,15 +4488,27 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
     document.getElementById("newReportBtn").addEventListener("click", startNewReport);
     document.getElementById("newSystemBtn").addEventListener("click", startNewSystemReport);
-    document.getElementById("backFromNewReportBtn").addEventListener("click", () => {
+    document.getElementById("backFromNewReportBtn").addEventListener("click", async () => {
+      const choice = await confirmSaveBeforeBack();
+      if (choice === "cancel") return;
+      if (choice === "save") {
+        await saveCurrentReport();
+        return;
+      }
       renderHome();
       showScreen("homeScreen");
     });
-    document.getElementById("backFromListingBtn").addEventListener("click", () => {
+    document.getElementById("backFromListingBtn").addEventListener("click", async () => {
+      const choice = await confirmSaveBeforeBack();
+      if (choice === "cancel") return;
+      if (choice === "save") saveState();
       renderHome();
       showScreen("newReportScreen");
     });
-    document.getElementById("backFromReportBtn").addEventListener("click", () => {
+    document.getElementById("backFromReportBtn").addEventListener("click", async () => {
+      const choice = await confirmSaveBeforeBack();
+      if (choice === "cancel") return;
+      if (choice === "save") await saveReportDetail();
       renderHome();
       showScreen(reportReturnScreen);
     });
@@ -4366,7 +4530,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
     document.getElementById("exportReportWorkBtn").addEventListener("click", exportCurrentReportWorkPdf);
     document.getElementById("mergeReportWorkFiles").addEventListener("change", mergeReportWorkPdfFiles);
-    document.getElementById("backFromWordTextBtn").addEventListener("click", () => {
+    document.getElementById("backFromWordTextBtn").addEventListener("click", async () => {
+      const choice = await confirmSaveBeforeBack();
+      if (choice === "cancel") return;
+      if (choice === "save") saveState();
       showCurrentReportScreen();
     });
     document.getElementById("downloadWordFromTextBtn").addEventListener("click", () => {
@@ -4390,8 +4557,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     document.getElementById("prepareChatGptBtn").addEventListener("click", prepareChatGptPrompt);
     document.getElementById("copyChatGptPromptBtn").addEventListener("click", copyChatGptPrompt);
     document.getElementById("applyChatGptResultBtn").addEventListener("click", applyChatGptResult);
-    document.getElementById("backFromSystemBtn").addEventListener("click", () => {
-      saveSystemInputs();
+    document.getElementById("backFromSystemBtn").addEventListener("click", async () => {
+      const choice = await confirmSaveBeforeBack();
+      if (choice === "cancel") return;
+      if (choice === "save") buildSystemReport(activeEntryId);
       if (systemReturnScreen === "report") {
         showCurrentReportScreen();
       } else {
@@ -4399,8 +4568,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         showScreen("newReportScreen");
       }
     });
-    document.getElementById("backFromQuickSystemBtn").addEventListener("click", () => {
-      saveQuickInputs();
+    document.getElementById("backFromQuickSystemBtn").addEventListener("click", async () => {
+      const choice = await confirmSaveBeforeBack();
+      if (choice === "cancel") return;
+      if (choice === "save") buildSystemReport(activeEntryId);
       showCurrentReportScreen("Selecciona otro sistema amarillo o vuelve al informe.");
     });
     document.getElementById("saveQuickSystemBtn").addEventListener("click", () => {
@@ -4410,7 +4581,17 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       saveQuickInputs();
       viewCurrentEntry();
     });
-    document.getElementById("backFromPreviewBtn").addEventListener("click", () => {
+    document.getElementById("backFromPreviewBtn").addEventListener("click", async () => {
+      const choice = await confirmSaveBeforeBack();
+      if (choice === "cancel") return;
+      if (choice === "save") {
+        if (previewMode === "entry") buildSystemReport(activeEntryId);
+        else if (previewReturnScreen === "report") await saveReportDetail();
+        else {
+          await saveCurrentReport();
+          return;
+        }
+      }
       if (previewMode === "set") {
         if (previewReturnScreen === "report") showCurrentReportScreen();
         else {
@@ -4557,7 +4738,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
     });
 
-    els.preparedEntries.addEventListener("click", event => {
+    els.preparedEntries.addEventListener("click", async event => {
       const editButton = event.target.closest("[data-edit-entry]");
       if (editButton) {
         systemReturnScreen = "newReport";
@@ -4568,7 +4749,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       const removeButton = event.target.closest("[data-remove-entry]");
       if (removeButton) {
         const entry = appState.current.entries.find(item => item.id === removeButton.dataset.removeEntry);
-        if (!window.confirm(`¿Quieres quitar definitivamente ${entry?.type || "este sistema"} del informe?`)) return;
+        if (!await confirmDeletion(`¿Quieres quitar definitivamente ${entry?.type || "este sistema"} del informe?`)) return;
         appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
         if (activeEntryId === removeButton.dataset.removeEntry) {
           activeEntryId = "";
@@ -4579,7 +4760,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
     });
 
-    els.reportPreparedEntries.addEventListener("click", event => {
+    els.reportPreparedEntries.addEventListener("click", async event => {
       const editButton = event.target.closest("[data-edit-entry]");
       if (editButton) {
         if (appState.current.format === "new") {
@@ -4594,7 +4775,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       const removeButton = event.target.closest("[data-remove-entry]");
       if (removeButton) {
         const entry = appState.current.entries.find(item => item.id === removeButton.dataset.removeEntry);
-        if (!window.confirm(`¿Quieres quitar definitivamente ${entry?.type || "este sistema"} del informe?`)) return;
+        if (!await confirmDeletion(`¿Quieres quitar definitivamente ${entry?.type || "este sistema"} del informe?`)) return;
         appState.current.entries = appState.current.entries.filter(entry => entry.id !== removeButton.dataset.removeEntry);
         if (activeEntryId === removeButton.dataset.removeEntry) {
           activeEntryId = "";
@@ -4610,14 +4791,14 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     });
     els.chatGptResult.addEventListener("input", saveSystemInputs);
 
-    els.savedReports.addEventListener("click", event => {
+    els.savedReports.addEventListener("click", async event => {
       const button = event.target.closest("[data-action]");
       if (!button) return;
       const report = getReport(button.dataset.id);
       if (!report) return;
 
       if (button.dataset.action === "delete") {
-        if (!window.confirm(`¿Quieres eliminar definitivamente el Informe ${report.number}?`)) return;
+        if (!await confirmDeletion(`¿Quieres eliminar definitivamente el Informe ${report.number}?`)) return;
         appState.savedReports = appState.savedReports.filter(item => item.id !== report.id);
         if (appState.current.editingId === report.id) {
           appState.current = {
@@ -4693,7 +4874,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
     });
 
-    els.photoContainer.addEventListener("click", event => {
+    els.photoContainer.addEventListener("click", async event => {
       const cameraButton = event.target.closest("[data-direct-camera]");
       if (cameraButton) {
         openDirectCamera(Number(cameraButton.dataset.directCamera), "old");
@@ -4704,7 +4885,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       const data = ensureEntry(activeEntryId);
       const index = Number(button.dataset.deletePhoto);
       if (!data.photos[index]) return;
-      if (!window.confirm(`¿Quieres eliminar definitivamente la foto ${index + 1}?`)) return;
+      if (!await confirmDeletion(`¿Quieres eliminar definitivamente la foto ${index + 1}?`)) return;
       data.photos[index] = null;
       data.mountedHtml = "";
       data.mountedText = "";
@@ -4737,7 +4918,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
     });
 
-    els.quickPhotoContainer.addEventListener("click", event => {
+    els.quickPhotoContainer.addEventListener("click", async event => {
       const cameraButton = event.target.closest("[data-direct-camera]");
       if (cameraButton) {
         openDirectCamera(Number(cameraButton.dataset.directCamera), "quick");
@@ -4748,7 +4929,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       const data = ensureEntry(activeEntryId);
       const index = Number(button.dataset.deletePhoto);
       if (!data.photos[index]) return;
-      if (!window.confirm(`¿Quieres eliminar definitivamente la foto ${index + 1}?`)) return;
+      if (!await confirmDeletion(`¿Quieres eliminar definitivamente la foto ${index + 1}?`)) return;
       data.photos[index] = null;
       data.mountedHtml = "";
       data.mountedText = "";
@@ -4759,6 +4940,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     els.takeDirectPhotoBtn.addEventListener("click", takeDirectPhoto);
     els.cancelDirectPhotoBtn.addEventListener("click", closeDirectCamera);
+    els.confirmDeleteBtn.addEventListener("click", () => finishDeleteConfirmation(true));
+    els.cancelDeleteBtn.addEventListener("click", () => finishDeleteConfirmation(false));
+    els.saveAndBackBtn.addEventListener("click", () => finishSaveConfirmation("save"));
+    els.backWithoutSaveBtn.addEventListener("click", () => finishSaveConfirmation("discard"));
+    els.cancelBackBtn.addEventListener("click", () => finishSaveConfirmation("cancel"));
 
     window.addEventListener("beforeinstallprompt", event => {
       event.preventDefault();
@@ -4773,13 +4959,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v53";
+        const reloadKey = "sistemas-sw-reload-v55";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=53", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=55", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

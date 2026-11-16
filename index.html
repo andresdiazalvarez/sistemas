@@ -908,7 +908,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 55</span>
+            <span class="app-version">VERSIÓN 56</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -2186,6 +2186,8 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
             <div class="button-row">
               <button class="btn green" type="button" data-action="pdf" data-id="${report.id}">PDF</button>
               <button class="btn blue" type="button" data-action="word" data-id="${report.id}">Word</button>
+              <button class="btn green" type="button" data-action="whatsapp" data-id="${report.id}">WhatsApp</button>
+              <button class="btn violet" type="button" data-action="chatgpt" data-id="${report.id}">ChatGPT</button>
             </div>
             <div class="saved-header">Cabecera: ${escapeHtml((report.header || "").toUpperCase() || "SIN CABECERA")}<br><span class="saved-meta">${report.systems.length} sistema(s) grabado(s)</span></div>
           </div>
@@ -4190,7 +4192,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       doc.save(filename);
     }
 
-    async function downloadPdfFromHtml(html, filename, embeddedPayload = null) {
+    async function downloadPdfFromHtml(html, filename, embeddedPayload = null, returnBlob = false) {
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ unit: "pt", format: "a4" });
       const pageState = { count: 0 };
@@ -4219,16 +4221,47 @@ ${item.voice.trim() || "Sin texto aportado."}`;
           await addElementToPdf(pdf, renderHost, pageState);
         }
         if (!pageState.count) addBlankPdfPage(pdf, pageState);
+        let outputBlob;
         if (embeddedPayload) {
           const pdfBytes = new Uint8Array(pdf.output("arraybuffer"));
           const markerBytes = new TextEncoder().encode(REPORT_PDF_DATA_MARKER);
           const payloadBytes = new TextEncoder().encode(JSON.stringify(embeddedPayload));
-          downloadBlob([pdfBytes, markerBytes, payloadBytes], "application/pdf", filename);
+          outputBlob = new Blob([pdfBytes, markerBytes, payloadBytes], { type: "application/pdf" });
         } else {
-          pdf.save(filename);
+          outputBlob = pdf.output("blob");
         }
+        if (returnBlob) return outputBlob;
+        downloadBlob(outputBlob, "application/pdf", filename);
       } finally {
         renderHost.remove();
+      }
+    }
+
+    async function shareSavedReportPdf(report, targetName) {
+      const filename = `${safeFileName(report.header || `informe-${report.number}`)}.pdf`;
+      try {
+        setStatus(els.homeStatus, `Preparando el PDF para ${targetName}...`);
+        const payload = makeReportPdfPayload(report, report.sourceEntries || []);
+        const blob = await downloadPdfFromHtml(buildFullHtml(report), filename, payload, true);
+        const file = new File([blob], filename, { type: "application/pdf" });
+        const shareData = {
+          title: savedReportTitle(report),
+          text: `Informe ${report.number}. Selecciona ${targetName} para enviarlo.`,
+          files: [file]
+        };
+        if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+          await navigator.share(shareData);
+          setStatus(els.homeStatus, `Informe preparado para compartir mediante ${targetName}.`);
+          return;
+        }
+        downloadBlob(blob, "application/pdf", filename);
+        setStatus(els.homeStatus, `Este dispositivo no permite compartir directamente. Se ha descargado ${filename}.`);
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          setStatus(els.homeStatus, "Envío cancelado.");
+          return;
+        }
+        setStatus(els.homeStatus, `No se pudo compartir. Prueba descargando el PDF.`, true);
       }
     }
 
@@ -4826,6 +4859,12 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       if (button.dataset.action === "pdf") {
         downloadPdfFromHtml(buildFullHtml(report), `informe-${report.number}.pdf`, makeReportPdfPayload(report, report.sourceEntries || []));
       }
+      if (button.dataset.action === "whatsapp") {
+        await shareSavedReportPdf(report, "WhatsApp");
+      }
+      if (button.dataset.action === "chatgpt") {
+        await shareSavedReportPdf(report, "ChatGPT");
+      }
     });
 
     els.savedReports.addEventListener("keydown", event => {
@@ -4959,13 +4998,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v55";
+        const reloadKey = "sistemas-sw-reload-v56";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=55", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=56", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

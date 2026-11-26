@@ -141,8 +141,14 @@
     .btn.lime { background: var(--lime); }
     .btn.pink { background: var(--pink); border-color: #d93686; color: #fff; }
     .btn.orange { background: #ff9b28; border-color: #a75000; color: #17110a; }
+    .report-import-actions { display: grid; gap: 8px; }
     .report-list-scroll { overflow-x: auto; }
     .report-list-scroll th, .report-list-scroll td { padding: 8px; border: 1px solid var(--line); }
+    .report-list-compact { width: 3ch; overflow: hidden; white-space: nowrap; }
+    .report-list-narrow { width: 4ch; overflow-wrap: anywhere; }
+    .report-list-photo { width: 64px; height: 48px; object-fit: cover; display: block; }
+    #reportListPhotoDialog img { display: block; max-width: 80vw; max-height: 72vh; margin-bottom: 10px; }
+    #reportListEditor { width: min(480px, 92vw); max-height: 85vh; border: 1px solid var(--line); border-radius: 8px; }
     .btn.green { background: var(--green); border-color: #15803d; color: #fff; }
     .btn.blue { background: var(--blue); border-color: #0b56b4; color: #fff; }
     .btn.violet { background: var(--violet); border-color: #5b21b6; color: #fff; }
@@ -911,7 +917,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 60</span>
+            <span class="app-version">VERSIÓN 64</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -1020,8 +1026,11 @@
           <button id="downloadReportDetailPdfBtn" class="btn green" type="button">Descargar PDF</button>
           <button id="downloadReportDetailWordBtn" class="btn blue" type="button">Cabeceras</button>
           <button id="exportReportWorkBtn" class="btn green" type="button">Descargar trabajo en PDF</button>
-          <label class="btn blue" for="mergeReportWorkFiles">Unir trabajos de otros móviles</label>
-          <input id="mergeReportWorkFiles" class="hidden-input" type="file" accept="application/pdf,.pdf" multiple>
+          <div class="report-import-actions">
+            <label class="btn blue" for="mergeReportWorkFiles">Unir trabajos de otros móviles</label>
+            <input id="mergeReportWorkFiles" class="hidden-input" type="file" accept="application/pdf,.pdf" multiple>
+            <button id="openReportListBtn" class="btn orange" type="button">Lista sistemas</button>
+          </div>
         </div>
 
         <div class="field">
@@ -1052,7 +1061,6 @@
         <div id="reportStatus" class="status" aria-live="polite"></div>
 
         <button id="deleteReportDetailBtn" class="btn delete-report-wide" type="button">ELIMINAR INFORME</button>
-        <div class="button-row"><button id="openReportListBtn" class="btn orange" type="button">Lista sistemas</button></div>
       </div>
     </section>
 
@@ -1075,6 +1083,20 @@
         </div>
         <div id="reportListStatus" class="status" aria-live="polite"></div>
         <div id="reportListTables" class="report-list-scroll" hidden></div>
+        <dialog id="reportListPhotoDialog" aria-label="Fotografía del equipo">
+          <img id="reportListFullPhoto" alt="Fotografía del equipo">
+          <form method="dialog"><button class="btn" type="submit">Cerrar</button></form>
+        </dialog>
+        <dialog id="reportListEditor" aria-labelledby="reportListEditorTitle">
+          <form id="reportListEditForm" method="dialog">
+            <h3 id="reportListEditorTitle">Editar datos</h3>
+            <div id="reportListEditFields"></div>
+            <div class="button-row">
+              <button class="btn green" type="submit" value="save">Grabar</button>
+              <button class="btn" type="submit" value="cancel" formnovalidate>Cancelar</button>
+            </div>
+          </form>
+        </dialog>
       </div>
     </section>
 
@@ -4596,15 +4618,62 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     const reportListDate = document.getElementById("reportListDate");
     const reportListTables = document.getElementById("reportListTables");
     const reportListStatus = document.getElementById("reportListStatus");
+    const reportListEditor = document.getElementById("reportListEditor");
+    const reportListEditFields = document.getElementById("reportListEditFields");
+    let editedReportListRow;
+
+    function reportListSeenIndex(headers) {
+      const index = headers.findIndex(header => String(header).trim().toLowerCase() === "ubicación" || String(header).trim().toLowerCase() === "ubicacion");
+      return index < 0 ? headers.length : index + 1;
+    }
+
+    function withReportListSeen(values, index, seen, photos = []) {
+      return [...values.slice(0, index), seen, ...photos, ...values.slice(index)];
+    }
+
+    async function readReportListPhotos(bytes, filename) {
+      const sheets = new Map();
+      if (!/\.xlsx$/i.test(filename)) return sheets;
+      if (!window.ExcelJS) throw new Error("El lector de fotografías no está disponible. Abre SISTEMAS con conexión e inténtalo de nuevo.");
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(bytes);
+      for (const sheet of workbook.worksheets) {
+        const rows = new Map();
+        for (const image of sheet.getImages().sort((a, b) => a.range.tl.nativeCol - b.range.tl.nativeCol)) {
+          const definition = workbook.getImage(image.imageId);
+          if (!definition?.buffer || !/^(png|jpeg|jpg|gif)$/i.test(definition.extension)) continue;
+          const row = image.range.tl.nativeRow;
+          const photos = rows.get(row) || [];
+          photos.push(`data:image/${definition.extension};base64,${bytesToBase64(definition.buffer)}`);
+          rows.set(row, photos);
+        }
+        sheets.set(sheet.name, rows);
+      }
+      return sheets;
+    }
 
     function renderReportList() {
       const list = appState.current.systemList;
-      reportListTables.innerHTML = list.sheets.map((sheet, sheetIndex) => `
+      reportListTables.innerHTML = list.sheets.map((sheet, sheetIndex) => {
+        const seenIndex = reportListSeenIndex(sheet.headers);
+        const compact = sheet.headers.map(header => /^(n[uú]mero|num\.?|n[º°](?: informe)?|equipo)$/i.test(String(header).trim()));
+        const headings = sheet.headers.map((header, index) => compact[index]
+          ? `<th scope="col"><div class="report-list-narrow">${escapeHtml(header)}</div></th>`
+          : `<th scope="col">${escapeHtml(header)}</th>`);
+        return `
         <h3>${escapeHtml(sheet.name)}</h3>
-        <table><thead><tr>${sheet.headers.map(header => `<th scope="col">${escapeHtml(header)}</th>`).join("")}<th scope="col">Visto</th></tr></thead>
-        <tbody>${sheet.rows.map((row, rowIndex) => `<tr>${row.cells.map(value => `<td>${escapeHtml(value)}</td>`).join("")}
-          <td><button type="button" class="btn ${row.seen ? "green" : "pink"}" aria-pressed="${row.seen}" data-sheet="${sheetIndex}" data-row="${rowIndex}">${row.seen ? "SÍ" : "Visto"}</button></td></tr>`).join("")}</tbody></table>
-      `).join("");
+        <table><thead><tr>${withReportListSeen(headings, seenIndex, '<th scope="col">Visto</th>', ['<th scope="col">Foto 1</th>', '<th scope="col">Foto 2</th>']).join("")}<th scope="col">Datos</th></tr></thead>
+        <tbody>${sheet.rows.map((row, rowIndex) => {
+          const cells = row.cells.map((value, index) => compact[index]
+            ? `<td><div class="report-list-compact" title="${escapeHtml(value)}">${escapeHtml(value)}</div></td>`
+            : `<td>${escapeHtml(value)}</td>`);
+          const seen = `<td><button type="button" class="btn ${row.seen ? "green" : "pink"}" aria-pressed="${row.seen}" data-sheet="${sheetIndex}" data-row="${rowIndex}">${row.seen ? "SÍ" : "Visto"}</button></td>`;
+          const photos = row.photos || [];
+          const photoCells = [[0], photos.slice(1).map((_, index) => index + 1)].map(indices => `<td>${indices.filter(index => photos[index]).map(index => `
+            <button type="button" aria-label="Ver foto ${index + 1}" data-list-photo="${index}" data-sheet="${sheetIndex}" data-row="${rowIndex}"><img class="report-list-photo" src="${escapeHtml(photos[index])}" alt=""></button>`).join("") || "—"}</td>`);
+          return `<tr>${withReportListSeen(cells, seenIndex, seen, photoCells).join("")}<td><button type="button" class="btn blue" data-edit-list-row data-sheet="${sheetIndex}" data-row="${rowIndex}">Ver</button></td></tr>`;
+        }).join("")}</tbody></table>`;
+      }).join("");
     }
 
     document.getElementById("openReportListBtn").addEventListener("click", () => {
@@ -4636,20 +4705,29 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       if (!file) return;
       const list = appState.current.systemList;
       try {
-        const book = XLSX.read(await file.arrayBuffer());
+        if (!window.XLSX) throw new Error("El lector de Excel no se ha cargado. Abre SISTEMAS con conexión a Internet y vuelve a intentarlo.");
+        const bytes = await file.arrayBuffer();
+        const book = XLSX.read(new Uint8Array(bytes), { type: "array" });
+        const photosBySheet = await readReportListPhotos(bytes, file.name);
         const sheets = [];
         for (const name of book.SheetNames) {
           if (name === "Datos lista sistemas") continue;
-          const [headers, ...rows] = XLSX.utils.sheet_to_json(book.Sheets[name], { header: 1, raw: false, defval: "", blankrows: false });
+          const worksheet = book.Sheets[name];
+          if (!worksheet["!ref"]) continue;
+          const [headers, ...rows] = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: "", blankrows: true });
           if (!headers?.length) continue;
+          const firstDataRow = XLSX.utils.decode_range(worksheet["!ref"]).s.r + 1;
           const seen = headers.findIndex(header => String(header).trim().toLowerCase() === "visto");
+          const dataColumns = headers.map((header, index) => index).filter(index =>
+            index !== seen && !/^foto\s+\d+$/i.test(String(headers[index]).trim()));
           sheets.push({
             name,
-            headers: headers.filter((_, index) => index !== seen),
-            rows: rows.map(row => ({
-              cells: headers.map((_, index) => row[index] ?? "").filter((_, index) => index !== seen),
-              seen: seen >= 0 && normalizeVisto(row[seen])
-            }))
+            headers: dataColumns.map(index => headers[index]),
+            rows: rows.map((row, index) => ({
+              cells: dataColumns.map(column => row[column] ?? ""),
+              seen: seen >= 0 && normalizeVisto(row[seen]),
+              photos: photosBySheet.get(name)?.get(firstDataRow + index) || []
+            })).filter(row => row.seen || row.photos.length || row.cells.some(Boolean))
           });
         }
         if (!sheets.some(sheet => sheet.rows.length)) throw new Error("El Excel no contiene filas.");
@@ -4664,8 +4742,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         saveState();
         renderReportList();
         setStatus(reportListStatus, file.name);
-      } catch {
-        setStatus(reportListStatus, "No se pudo cargar el Excel o no contiene filas.", true);
+      } catch (error) {
+        setStatus(reportListStatus, `No se pudo cargar ${file.name}. ${error.message}`, true);
       } finally {
         event.target.value = "";
       }
@@ -4678,13 +4756,36 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     reportListTables.addEventListener("click", event => {
       const button = event.target.closest("button[data-row]");
       if (!button) return;
-      const row = appState.current.systemList.sheets[button.dataset.sheet].rows[button.dataset.row];
+      const sheet = appState.current.systemList.sheets[button.dataset.sheet];
+      const row = sheet.rows[button.dataset.row];
+      if (button.hasAttribute("data-list-photo")) {
+        document.getElementById("reportListFullPhoto").src = row.photos[button.dataset.listPhoto];
+        document.getElementById("reportListPhotoDialog").showModal();
+        return;
+      }
+      if (button.hasAttribute("data-edit-list-row")) {
+        editedReportListRow = row;
+        reportListEditor.returnValue = "";
+        reportListEditFields.innerHTML = sheet.headers.map((header, index) => `
+          <div class="field"><label for="reportListEdit-${index}">${escapeHtml(header) || `Columna ${index + 1}`}</label>
+          <input id="reportListEdit-${index}" type="text" value="${escapeHtml(row.cells[index])}"></div>`).join("");
+        reportListEditor.showModal();
+        return;
+      }
       row.seen = !row.seen;
       button.textContent = row.seen ? "SÍ" : "Visto";
       button.classList.toggle("green", row.seen);
       button.classList.toggle("pink", !row.seen);
       button.setAttribute("aria-pressed", row.seen);
       saveState();
+    });
+    reportListEditor.addEventListener("close", () => {
+      if (reportListEditor.returnValue === "save" && editedReportListRow) {
+        editedReportListRow.cells = Array.from(reportListEditFields.querySelectorAll("input"), input => input.value);
+        saveState();
+        renderReportList();
+      }
+      editedReportListRow = null;
     });
     document.getElementById("deleteReportListBtn").addEventListener("click", async () => {
       const list = appState.current.systemList;
@@ -4695,20 +4796,28 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       saveState();
       setStatus(reportListStatus, "Excel eliminado.");
     });
-    document.getElementById("exportReportListBtn").addEventListener("click", () => {
+    document.getElementById("exportReportListBtn").addEventListener("click", async () => {
       const list = appState.current.systemList;
       if (!list.sheets.length) {
         setStatus(reportListStatus, "No hay Excel cargado.", true);
         return;
       }
       try {
-        const book = XLSX.utils.book_new();
+        const book = new ExcelJS.Workbook();
         for (const sheet of list.sheets) {
-          const rows = [[...sheet.headers, "Visto"], ...sheet.rows.map(row => [...row.cells, row.seen ? "SÍ" : "NO"])];
-          XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), sheet.name);
+          const index = reportListSeenIndex(sheet.headers);
+          const output = book.addWorksheet(sheet.name);
+          const photoCount = sheet.rows.reduce((count, row) => Math.max(count, row.photos?.length || 0), 2);
+          output.addRow(withReportListSeen(sheet.headers, index, "Visto", Array.from({ length: photoCount }, (_, i) => `Foto ${i + 1}`)));
+          for (let i = 0; i < photoCount; i += 1) output.getColumn(index + 2 + i).width = 23;
+          for (const row of sheet.rows) {
+            const outputRow = output.addRow(withReportListSeen(row.cells, index, row.seen ? "SÍ" : "NO", Array(photoCount).fill("")));
+            if (row.photos?.length) outputRow.height = 88;
+            (row.photos || []).forEach((photo, i) => addPhotoToExcelCell(book, output, outputRow, index + 1 + i, photo));
+          }
         }
-        XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["Cliente", list.client], ["Fecha", list.date]]), "Datos lista sistemas");
-        XLSX.writeFile(book, "lista-sistemas.xlsx");
+        book.addWorksheet("Datos lista sistemas").addRows([["Cliente", list.client], ["Fecha", list.date]]);
+        downloadBlob(await book.xlsx.writeBuffer(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "lista-sistemas.xlsx");
       } catch {
         setStatus(reportListStatus, "No se pudo descargar el Excel.", true);
       }
@@ -5161,13 +5270,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v60";
+        const reloadKey = "sistemas-sw-reload-v64";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=60", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=64", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

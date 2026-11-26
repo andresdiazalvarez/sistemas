@@ -140,6 +140,9 @@
     .btn:disabled { opacity: .5; cursor: not-allowed; }
     .btn.lime { background: var(--lime); }
     .btn.pink { background: var(--pink); border-color: #d93686; color: #fff; }
+    .btn.orange { background: #ff9b28; border-color: #a75000; color: #17110a; }
+    .report-list-scroll { overflow-x: auto; }
+    .report-list-scroll th, .report-list-scroll td { padding: 8px; border: 1px solid var(--line); }
     .btn.green { background: var(--green); border-color: #15803d; color: #fff; }
     .btn.blue { background: var(--blue); border-color: #0b56b4; color: #fff; }
     .btn.violet { background: var(--violet); border-color: #5b21b6; color: #fff; }
@@ -908,7 +911,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 59</span>
+            <span class="app-version">VERSIÓN 60</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -1014,7 +1017,6 @@
 
         <div class="button-row report-actions">
           <button id="saveReportDetailBtn" class="btn pink" type="button">Grabar</button>
-          <button id="viewReportDetailBtn" class="btn violet" type="button">Ver conjunto</button>
           <button id="downloadReportDetailPdfBtn" class="btn green" type="button">Descargar PDF</button>
           <button id="downloadReportDetailWordBtn" class="btn blue" type="button">Cabeceras</button>
           <button id="exportReportWorkBtn" class="btn green" type="button">Descargar trabajo en PDF</button>
@@ -1050,6 +1052,29 @@
         <div id="reportStatus" class="status" aria-live="polite"></div>
 
         <button id="deleteReportDetailBtn" class="btn delete-report-wide" type="button">ELIMINAR INFORME</button>
+        <div class="button-row"><button id="openReportListBtn" class="btn orange" type="button">Lista sistemas</button></div>
+      </div>
+    </section>
+
+    <section id="reportListScreen" class="screen" aria-labelledby="reportListTitle">
+      <div class="panel">
+        <div class="toolbar">
+          <h2 id="reportListTitle">Lista sistemas</h2>
+          <button id="backFromReportListBtn" class="btn" type="button">Volver</button>
+        </div>
+        <div class="short-fields">
+          <div class="field"><label for="reportListClient">Cliente</label><input id="reportListClient" type="text"></div>
+          <div class="field"><label for="reportListDate">Fecha</label><input id="reportListDate" type="date"></div>
+        </div>
+        <div class="button-row">
+          <label class="btn pink" for="reportListFile">Cargar Excel</label>
+          <input id="reportListFile" class="hidden-input" type="file" accept=".xlsx,.xls">
+          <button id="exportReportListBtn" class="btn green" type="button">Descargar Excel</button>
+          <button id="deleteReportListBtn" class="btn red" type="button">Eliminar Excel</button>
+          <button id="viewReportListBtn" class="btn blue" type="button" aria-controls="reportListTables">Ver Excel</button>
+        </div>
+        <div id="reportListStatus" class="status" aria-live="polite"></div>
+        <div id="reportListTables" class="report-list-scroll" hidden></div>
       </div>
     </section>
 
@@ -2039,7 +2064,7 @@ Instalaciones de detección de gases: Aplicables cuando existan detectores, cent
     }
 
     function showScreen(name, options = {}) {
-      [els.homeScreen, els.newReportScreen, els.listingScreen, els.reportScreen, els.systemScreen, els.quickSystemScreen, els.wordTextScreen, els.previewScreen].forEach(screen => screen.classList.remove("active"));
+      document.querySelectorAll(".screen.active").forEach(screen => screen.classList.remove("active"));
       document.getElementById(name).classList.add("active");
       if (!options.keepScroll) window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -3634,7 +3659,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       saveSystemInputs();
       const systems = collectCurrentSystems();
 
-      if (!systems.length && !appState.current.header.trim()) {
+      if (!systems.length && !appState.current.header.trim() && !appState.current.systemList?.sheets.length) {
         setStatus(els.homeStatus, "No hay datos para grabar.", true);
         return;
       }
@@ -3653,6 +3678,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         systems,
         sourceSystems: cloneData(appState.current.systems),
         sourceEntries: cloneData(appState.current.entries),
+        systemList: appState.current.systemList,
         createdAt: new Date().toISOString()
       };
       const previousCurrent = cloneData(appState.current);
@@ -3716,6 +3742,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         systems,
         sourceSystems: cloneData(appState.current.systems),
         sourceEntries: cloneData(appState.current.entries),
+        systemList: appState.current.systemList,
         updatedAt: new Date().toISOString()
       };
       normalizeSavedReports();
@@ -3890,7 +3917,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         notes: report.notes || "",
         systems: systemsFromSavedReport(report),
         entries,
-        editingId: report.id
+        editingId: report.id,
+        systemList: report.systemList ? cloneData(report.systemList) : undefined
       };
       appState.nextNumber = getNextReportNumber();
       saveState();
@@ -3903,6 +3931,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         appState.current.header.trim()
         || appState.current.notes.trim()
         || appState.current.entries.length
+        || appState.current.systemList?.sheets.length
       );
       if (!appState.current.editingId && hasDraft) {
         renderHome();
@@ -3922,6 +3951,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
             systems: collectCurrentSystems(),
             sourceSystems: cloneData(appState.current.systems),
             sourceEntries: cloneData(appState.current.entries),
+            systemList: appState.current.systemList,
             updatedAt: new Date().toISOString()
           };
         }
@@ -4562,9 +4592,126 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       showScreen(reportReturnScreen);
     });
     document.getElementById("saveReportDetailBtn").addEventListener("click", saveReportDetail);
-    document.getElementById("viewReportDetailBtn").addEventListener("click", () => {
-      previewReturnScreen = "report";
-      viewCurrentSet();
+    const reportListClient = document.getElementById("reportListClient");
+    const reportListDate = document.getElementById("reportListDate");
+    const reportListTables = document.getElementById("reportListTables");
+    const reportListStatus = document.getElementById("reportListStatus");
+
+    function renderReportList() {
+      const list = appState.current.systemList;
+      reportListTables.innerHTML = list.sheets.map((sheet, sheetIndex) => `
+        <h3>${escapeHtml(sheet.name)}</h3>
+        <table><thead><tr>${sheet.headers.map(header => `<th scope="col">${escapeHtml(header)}</th>`).join("")}<th scope="col">Visto</th></tr></thead>
+        <tbody>${sheet.rows.map((row, rowIndex) => `<tr>${row.cells.map(value => `<td>${escapeHtml(value)}</td>`).join("")}
+          <td><button type="button" class="btn ${row.seen ? "green" : "pink"}" aria-pressed="${row.seen}" data-sheet="${sheetIndex}" data-row="${rowIndex}">${row.seen ? "SÍ" : "Visto"}</button></td></tr>`).join("")}</tbody></table>
+      `).join("");
+    }
+
+    document.getElementById("openReportListBtn").addEventListener("click", () => {
+      syncReportDetailFields();
+      const list = appState.current.systemList ??= { client: appState.current.header, date: "", sheets: [] };
+      reportListClient.value = list.client;
+      reportListDate.value = list.date;
+      reportListTables.hidden = true;
+      setStatus(reportListStatus, "");
+      showScreen("reportListScreen");
+    });
+    for (const [input, field] of [[reportListClient, "client"], [reportListDate, "date"]]) {
+      input.addEventListener("change", () => {
+        appState.current.systemList[field] = input.value;
+        saveState();
+      });
+    }
+    document.getElementById("backFromReportListBtn").addEventListener("click", async () => {
+      const choice = await confirmSaveBeforeBack();
+      if (choice === "cancel") return;
+      if (choice === "save") {
+        await saveReportDetail();
+        return;
+      }
+      showCurrentReportScreen();
+    });
+    document.getElementById("reportListFile").addEventListener("change", async event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const list = appState.current.systemList;
+      try {
+        const book = XLSX.read(await file.arrayBuffer());
+        const sheets = [];
+        for (const name of book.SheetNames) {
+          if (name === "Datos lista sistemas") continue;
+          const [headers, ...rows] = XLSX.utils.sheet_to_json(book.Sheets[name], { header: 1, raw: false, defval: "", blankrows: false });
+          if (!headers?.length) continue;
+          const seen = headers.findIndex(header => String(header).trim().toLowerCase() === "visto");
+          sheets.push({
+            name,
+            headers: headers.filter((_, index) => index !== seen),
+            rows: rows.map(row => ({
+              cells: headers.map((_, index) => row[index] ?? "").filter((_, index) => index !== seen),
+              seen: seen >= 0 && normalizeVisto(row[seen])
+            }))
+          });
+        }
+        if (!sheets.some(sheet => sheet.rows.length)) throw new Error("El Excel no contiene filas.");
+        if (list.sheets.length && !await confirmDeletion("¿Quieres sustituir el Excel de esta lista?")) return;
+        if (appState.current.systemList !== list) return;
+        const metadata = book.Sheets["Datos lista sistemas"];
+        if (metadata) {
+          list.client = reportListClient.value = String(metadata.B1?.v ?? list.client);
+          list.date = reportListDate.value = String(metadata.B2?.v ?? list.date);
+        }
+        list.sheets = sheets;
+        saveState();
+        renderReportList();
+        setStatus(reportListStatus, file.name);
+      } catch {
+        setStatus(reportListStatus, "No se pudo cargar el Excel o no contiene filas.", true);
+      } finally {
+        event.target.value = "";
+      }
+    });
+    document.getElementById("viewReportListBtn").addEventListener("click", () => {
+      renderReportList();
+      reportListTables.hidden = false;
+      if (!appState.current.systemList.sheets.length) setStatus(reportListStatus, "No hay Excel cargado.");
+    });
+    reportListTables.addEventListener("click", event => {
+      const button = event.target.closest("button[data-row]");
+      if (!button) return;
+      const row = appState.current.systemList.sheets[button.dataset.sheet].rows[button.dataset.row];
+      row.seen = !row.seen;
+      button.textContent = row.seen ? "SÍ" : "Visto";
+      button.classList.toggle("green", row.seen);
+      button.classList.toggle("pink", !row.seen);
+      button.setAttribute("aria-pressed", row.seen);
+      saveState();
+    });
+    document.getElementById("deleteReportListBtn").addEventListener("click", async () => {
+      const list = appState.current.systemList;
+      if (!list.sheets.length || !await confirmDeletion("¿Quieres eliminar el Excel de esta lista?")) return;
+      list.sheets = [];
+      reportListTables.hidden = true;
+      renderReportList();
+      saveState();
+      setStatus(reportListStatus, "Excel eliminado.");
+    });
+    document.getElementById("exportReportListBtn").addEventListener("click", () => {
+      const list = appState.current.systemList;
+      if (!list.sheets.length) {
+        setStatus(reportListStatus, "No hay Excel cargado.", true);
+        return;
+      }
+      try {
+        const book = XLSX.utils.book_new();
+        for (const sheet of list.sheets) {
+          const rows = [[...sheet.headers, "Visto"], ...sheet.rows.map(row => [...row.cells, row.seen ? "SÍ" : "NO"])];
+          XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), sheet.name);
+        }
+        XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["Cliente", list.client], ["Fecha", list.date]]), "Datos lista sistemas");
+        XLSX.writeFile(book, "lista-sistemas.xlsx");
+      } catch {
+        setStatus(reportListStatus, "No se pudo descargar el Excel.", true);
+      }
     });
     document.getElementById("downloadReportDetailPdfBtn").addEventListener("click", async () => {
       const report = makeCurrentReportSnapshot();
@@ -5014,13 +5161,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v59";
+        const reloadKey = "sistemas-sw-reload-v60";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=59", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=60", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

@@ -149,6 +149,7 @@
     .report-list-photo { width: 64px; height: 48px; object-fit: cover; display: block; }
     #reportListPhotoDialog img { display: block; max-width: 80vw; max-height: 72vh; margin-bottom: 10px; }
     #reportListEditor { width: min(480px, 92vw); max-height: 85vh; border: 1px solid var(--line); border-radius: 8px; }
+    .report-list-edit-photo { display: block; max-width: 100%; max-height: 280px; object-fit: contain; margin-bottom: 8px; }
     .btn.green { background: var(--green); border-color: #15803d; color: #fff; }
     .btn.blue { background: var(--blue); border-color: #0b56b4; color: #fff; }
     .btn.violet { background: var(--violet); border-color: #5b21b6; color: #fff; }
@@ -917,7 +918,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 64</span>
+            <span class="app-version">VERSIÓN 65</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -1091,8 +1092,10 @@
           <form id="reportListEditForm" method="dialog">
             <h3 id="reportListEditorTitle">Editar datos</h3>
             <div id="reportListEditFields"></div>
+            <div id="reportListEditPhotos"></div>
+            <p id="reportListPhotoStatus" role="status"></p>
             <div class="button-row">
-              <button class="btn green" type="submit" value="save">Grabar</button>
+              <button id="saveReportListRowBtn" class="btn green" type="submit" value="save">Grabar</button>
               <button class="btn" type="submit" value="cancel" formnovalidate>Cancelar</button>
             </div>
           </form>
@@ -4620,7 +4623,49 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     const reportListStatus = document.getElementById("reportListStatus");
     const reportListEditor = document.getElementById("reportListEditor");
     const reportListEditFields = document.getElementById("reportListEditFields");
+    const reportListEditPhotos = document.getElementById("reportListEditPhotos");
+    const reportListPhotoStatus = document.getElementById("reportListPhotoStatus");
+    const saveReportListRowBtn = document.getElementById("saveReportListRowBtn");
     let editedReportListRow;
+    let editedReportListPhotos;
+
+    function renderReportListEditPhotos() {
+      const count = Math.max(2, editedReportListPhotos.length);
+      reportListEditPhotos.innerHTML = Array.from({ length: count }, (_, index) => {
+        const photo = editedReportListPhotos[index];
+        return `<fieldset class="field">
+          <legend>Foto ${index + 1}</legend>
+          ${photo ? `<img class="report-list-edit-photo" src="${escapeHtml(photo)}" alt="Foto ${index + 1}">` : "<p>Sin foto</p>"}
+          <label>Buscar imagen <input type="file" accept="image/*" data-edit-photo="${index}"></label>
+          <label>Hacer foto <input type="file" accept="image/*" capture="environment" data-edit-photo="${index}"></label>
+        </fieldset>`;
+      }).join("");
+    }
+
+    reportListEditPhotos.addEventListener("change", async event => {
+      const input = event.target.closest("[data-edit-photo]");
+      const file = input?.files[0];
+      if (!file) return;
+      const photos = editedReportListPhotos;
+      saveReportListRowBtn.disabled = true;
+      reportListEditPhotos.querySelectorAll("input").forEach(field => { field.disabled = true; });
+      setStatus(reportListPhotoStatus, "Preparando foto…");
+      try {
+        const photo = await compressImageFile(file);
+        if (editedReportListPhotos !== photos || !reportListEditor.open) return;
+        photos[Number(input.dataset.editPhoto)] = photo;
+        renderReportListEditPhotos();
+        setStatus(reportListPhotoStatus, "");
+      } catch {
+        if (editedReportListPhotos === photos) setStatus(reportListPhotoStatus, "No se pudo cargar la foto.", true);
+      } finally {
+        if (editedReportListPhotos === photos) {
+          input.value = "";
+          saveReportListRowBtn.disabled = false;
+          reportListEditPhotos.querySelectorAll("input").forEach(field => { field.disabled = false; });
+        }
+      }
+    });
 
     function reportListSeenIndex(headers) {
       const index = headers.findIndex(header => String(header).trim().toLowerCase() === "ubicación" || String(header).trim().toLowerCase() === "ubicacion");
@@ -4631,7 +4676,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       return [...values.slice(0, index), seen, ...photos, ...values.slice(index)];
     }
 
-    async function readReportListPhotos(bytes, filename) {
+    async function readReportListPhotos(bytes, filename, sourceBook) {
       const sheets = new Map();
       if (!/\.xlsx$/i.test(filename)) return sheets;
       if (!window.ExcelJS) throw new Error("El lector de fotografías no está disponible. Abre SISTEMAS con conexión e inténtalo de nuevo.");
@@ -4639,12 +4684,19 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       await workbook.xlsx.load(bytes);
       for (const sheet of workbook.worksheets) {
         const rows = new Map();
+        const source = sourceBook.Sheets[sheet.name];
+        const headerRow = source?.["!ref"] ? XLSX.utils.decode_range(source["!ref"]).s.r : 0;
         for (const image of sheet.getImages().sort((a, b) => a.range.tl.nativeCol - b.range.tl.nativeCol)) {
           const definition = workbook.getImage(image.imageId);
           if (!definition?.buffer || !/^(png|jpeg|jpg|gif)$/i.test(definition.extension)) continue;
           const row = image.range.tl.nativeRow;
           const photos = rows.get(row) || [];
-          photos.push(`data:image/${definition.extension};base64,${bytesToBase64(definition.buffer)}`);
+          const address = XLSX.utils.encode_cell({ r: headerRow, c: image.range.tl.nativeCol });
+          const heading = /^foto\s+([1-9]\d{0,2})$/i.exec(String(source?.[address]?.v || "").trim());
+          const slot = heading ? Number(heading[1]) - 1 : photos.length;
+          const photo = `data:image/${definition.extension};base64,${bytesToBase64(definition.buffer)}`;
+          if (photos[slot]) photos.push(photo);
+          else photos[slot] = photo;
           rows.set(row, photos);
         }
         sheets.set(sheet.name, rows);
@@ -4708,7 +4760,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         if (!window.XLSX) throw new Error("El lector de Excel no se ha cargado. Abre SISTEMAS con conexión a Internet y vuelve a intentarlo.");
         const bytes = await file.arrayBuffer();
         const book = XLSX.read(new Uint8Array(bytes), { type: "array" });
-        const photosBySheet = await readReportListPhotos(bytes, file.name);
+        const photosBySheet = await readReportListPhotos(bytes, file.name, book);
         const sheets = [];
         for (const name of book.SheetNames) {
           if (name === "Datos lista sistemas") continue;
@@ -4765,6 +4817,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
       if (button.hasAttribute("data-edit-list-row")) {
         editedReportListRow = row;
+        editedReportListPhotos = [...(row.photos || [])];
+        renderReportListEditPhotos();
+        setStatus(reportListPhotoStatus, "");
+        saveReportListRowBtn.disabled = false;
         reportListEditor.returnValue = "";
         reportListEditFields.innerHTML = sheet.headers.map((header, index) => `
           <div class="field"><label for="reportListEdit-${index}">${escapeHtml(header) || `Columna ${index + 1}`}</label>
@@ -4782,10 +4838,12 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     reportListEditor.addEventListener("close", () => {
       if (reportListEditor.returnValue === "save" && editedReportListRow) {
         editedReportListRow.cells = Array.from(reportListEditFields.querySelectorAll("input"), input => input.value);
+        editedReportListRow.photos = editedReportListPhotos;
         saveState();
         renderReportList();
       }
       editedReportListRow = null;
+      editedReportListPhotos = null;
     });
     document.getElementById("deleteReportListBtn").addEventListener("click", async () => {
       const list = appState.current.systemList;
@@ -5270,13 +5328,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v64";
+        const reloadKey = "sistemas-sw-reload-v65";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=64", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=65", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

@@ -918,7 +918,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 65</span>
+            <span class="app-version">VERSIÓN 66</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -1079,7 +1079,6 @@
           <label class="btn pink" for="reportListFile">Cargar Excel</label>
           <input id="reportListFile" class="hidden-input" type="file" accept=".xlsx,.xls">
           <button id="exportReportListBtn" class="btn green" type="button">Descargar Excel</button>
-          <button id="deleteReportListBtn" class="btn red" type="button">Eliminar Excel</button>
           <button id="viewReportListBtn" class="btn blue" type="button" aria-controls="reportListTables">Ver Excel</button>
         </div>
         <div id="reportListStatus" class="status" aria-live="polite"></div>
@@ -4621,6 +4620,17 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     const reportListDate = document.getElementById("reportListDate");
     const reportListTables = document.getElementById("reportListTables");
     const reportListStatus = document.getElementById("reportListStatus");
+    async function saveReportList() {
+      const report = getReport(appState.current.editingId);
+      if (report) report.systemList = cloneData(appState.current.systemList);
+      const dbWrite = saveStateToDb(appState);
+      const localOk = saveStateToLocalStorage();
+      const dbOk = await dbWrite;
+      if (!dbOk && !localOk) {
+        setStatus(reportListStatus, "No se pudo guardar la lista en este dispositivo.", true);
+      }
+      return dbOk || localOk;
+    }
     const reportListEditor = document.getElementById("reportListEditor");
     const reportListEditFields = document.getElementById("reportListEditFields");
     const reportListEditPhotos = document.getElementById("reportListEditPhotos");
@@ -4740,7 +4750,7 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     for (const [input, field] of [[reportListClient, "client"], [reportListDate, "date"]]) {
       input.addEventListener("change", () => {
         appState.current.systemList[field] = input.value;
-        saveState();
+        saveReportList();
       });
     }
     document.getElementById("backFromReportListBtn").addEventListener("click", async () => {
@@ -4791,9 +4801,8 @@ ${item.voice.trim() || "Sin texto aportado."}`;
           list.date = reportListDate.value = String(metadata.B2?.v ?? list.date);
         }
         list.sheets = sheets;
-        saveState();
         renderReportList();
-        setStatus(reportListStatus, file.name);
+        if (await saveReportList()) setStatus(reportListStatus, file.name);
       } catch (error) {
         setStatus(reportListStatus, `No se pudo cargar ${file.name}. ${error.message}`, true);
       } finally {
@@ -4833,26 +4842,17 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       button.classList.toggle("green", row.seen);
       button.classList.toggle("pink", !row.seen);
       button.setAttribute("aria-pressed", row.seen);
-      saveState();
+      saveReportList();
     });
     reportListEditor.addEventListener("close", () => {
       if (reportListEditor.returnValue === "save" && editedReportListRow) {
         editedReportListRow.cells = Array.from(reportListEditFields.querySelectorAll("input"), input => input.value);
         editedReportListRow.photos = editedReportListPhotos;
-        saveState();
+        saveReportList();
         renderReportList();
       }
       editedReportListRow = null;
       editedReportListPhotos = null;
-    });
-    document.getElementById("deleteReportListBtn").addEventListener("click", async () => {
-      const list = appState.current.systemList;
-      if (!list.sheets.length || !await confirmDeletion("¿Quieres eliminar el Excel de esta lista?")) return;
-      list.sheets = [];
-      reportListTables.hidden = true;
-      renderReportList();
-      saveState();
-      setStatus(reportListStatus, "Excel eliminado.");
     });
     document.getElementById("exportReportListBtn").addEventListener("click", async () => {
       const list = appState.current.systemList;
@@ -5328,13 +5328,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v65";
+        const reloadKey = "sistemas-sw-reload-v66";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=65", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=66", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

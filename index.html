@@ -369,7 +369,7 @@
       transition: transform .15s ease, box-shadow .15s ease;
     }
 
-    .saved-item:hover,
+    .saved-item:hover:not(:has(button:hover)),
     .saved-item:focus-visible {
       transform: translateY(-1px);
       box-shadow: 0 8px 20px rgba(80, 70, 0, .16);
@@ -908,7 +908,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 56</span>
+            <span class="app-version">VERSIÓN 59</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -922,7 +922,6 @@
         <div class="toolbar">
           <h2 id="homeTitle">Informes grabados</h2>
           <div class="home-create-actions">
-            <button id="newReportBtn" class="btn pink" type="button">Crear nuevo informe</button>
             <button id="newSystemBtn" class="btn blue new-system-launch" type="button">SISTEMA NUEVO</button>
           </div>
         </div>
@@ -1324,9 +1323,11 @@
       if (system === SYSTEMS[3]) return GROUP_PRESSURE_CHECKS;
       if (system === SYSTEMS[4]) return EXTINCTION_SYSTEM_CHECKS;
       if (system === SYSTEMS[1]) return EXTINCTION_SYSTEM_CHECKS;
-      return system === SYSTEMS[2]
-        ? [...SYSTEM_CHECKS, ...EXTINCTION_EXTRA_CHECKS]
-        : SYSTEM_CHECKS;
+      if (system === SYSTEMS[0] || system === SYSTEMS[2]) {
+        const centralChecks = [SYSTEM_CHECKS[0], "No funcionando", ...SYSTEM_CHECKS.slice(1)];
+        return system === SYSTEMS[2] ? [...centralChecks, ...EXTINCTION_EXTRA_CHECKS] : centralChecks;
+      }
+      return SYSTEM_CHECKS;
     }
 
     const COMMON_STATE_FIXED_TEXT = "El sistema queda descrito conforme al estado observado.";
@@ -1334,6 +1335,7 @@
     const SYSTEM_NAME_SWAP_REVISION = 1;
 
     const DEFAULT_CHECK_NOTES = {
+      "No funcionando": "La central no está funcionando. Se encuentra desconectada y sin servicio.",
       "Funcionando": `Durante la revisión se ha comprobado que la central se encuentra en funcionamiento. El equipo permanece alimentado y presenta indicación normal en el momento de la comprobación. Se han revisado los mandos e indicadores disponibles, verificándose su respuesta durante las maniobras realizadas.`,
       "Con averías": `La central presenta avisos de avería activos durante la revisión. Las incidencias quedan reflejadas en la pantalla, pilotos o indicadores del equipo. Se identifican los mensajes mostrados por la central y los elementos asociados a dichos avisos.`,
       "Baterías": `El equipo presenta aviso relacionado con las baterías o con la ausencia de estas en la central. Se comprueba la existencia, estado y conexión de las baterías cuando el equipo dispone de ellas. La incidencia aparece indicada mediante la pantalla, pilotos o señalización de la central.`,
@@ -4237,8 +4239,11 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       }
     }
 
-    async function shareSavedReportPdf(report, targetName) {
+    async function shareSavedReportPdf(report, targetName, button) {
       const filename = `${safeFileName(report.header || `informe-${report.number}`)}.pdf`;
+      const shareAction = button.dataset.action;
+      button.disabled = true;
+      button.textContent = "Preparando…";
       try {
         setStatus(els.homeStatus, `Preparando el PDF para ${targetName}...`);
         const payload = makeReportPdfPayload(report, report.sourceEntries || []);
@@ -4249,19 +4254,31 @@ ${item.voice.trim() || "Sin texto aportado."}`;
           text: `Informe ${report.number}. Selecciona ${targetName} para enviarlo.`,
           files: [file]
         };
-        if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-          await navigator.share(shareData);
-          setStatus(els.homeStatus, `Informe preparado para compartir mediante ${targetName}.`);
+        if (!navigator.share || (navigator.canShare && !navigator.canShare({ files: [file] }))) {
+          setStatus(els.homeStatus, `Este navegador no permite compartir archivos. Usa PDF y adjunta el archivo en ${targetName}.`, true);
           return;
         }
-        downloadBlob(blob, "application/pdf", filename);
-        setStatus(els.homeStatus, `Este dispositivo no permite compartir directamente. Se ha descargado ${filename}.`);
+        delete button.dataset.action;
+        button.textContent = "Compartir PDF";
+        setStatus(els.homeStatus, `Pulsa Compartir PDF y elige ${targetName}.`);
+        button.addEventListener("click", async event => {
+          event.stopPropagation();
+          try {
+            await navigator.share(shareData);
+          } catch (error) {
+            if (error?.name !== "AbortError") {
+              setStatus(els.homeStatus, `No se pudo compartir. Usa PDF y adjunta el archivo en ${targetName}.`, true);
+            }
+          } finally {
+            button.dataset.action = shareAction;
+            button.textContent = targetName;
+          }
+        }, { once: true });
       } catch (error) {
-        if (error?.name === "AbortError") {
-          setStatus(els.homeStatus, "Envío cancelado.");
-          return;
-        }
-        setStatus(els.homeStatus, `No se pudo compartir. Prueba descargando el PDF.`, true);
+        setStatus(els.homeStatus, "No se pudo preparar el PDF.", true);
+      } finally {
+        button.disabled = false;
+        if (button.dataset.action) button.textContent = targetName;
       }
     }
 
@@ -4519,7 +4536,6 @@ ${item.voice.trim() || "Sin texto aportado."}`;
       renderListing();
       showScreen("listingScreen");
     });
-    document.getElementById("newReportBtn").addEventListener("click", startNewReport);
     document.getElementById("newSystemBtn").addEventListener("click", startNewSystemReport);
     document.getElementById("backFromNewReportBtn").addEventListener("click", async () => {
       const choice = await confirmSaveBeforeBack();
@@ -4860,10 +4876,10 @@ ${item.voice.trim() || "Sin texto aportado."}`;
         downloadPdfFromHtml(buildFullHtml(report), `informe-${report.number}.pdf`, makeReportPdfPayload(report, report.sourceEntries || []));
       }
       if (button.dataset.action === "whatsapp") {
-        await shareSavedReportPdf(report, "WhatsApp");
+        await shareSavedReportPdf(report, "WhatsApp", button);
       }
       if (button.dataset.action === "chatgpt") {
-        await shareSavedReportPdf(report, "ChatGPT");
+        await shareSavedReportPdf(report, "ChatGPT", button);
       }
     });
 
@@ -4998,13 +5014,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v56";
+        const reloadKey = "sistemas-sw-reload-v59";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=56", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=59", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();

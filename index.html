@@ -918,7 +918,7 @@
         <div>
           <div class="brand-title-row">
             <h1>SISTEMAS</h1>
-            <span class="app-version">VERSIÓN 66</span>
+            <span class="app-version">VERSIÓN 67</span>
             <button id="installAppBtn" class="btn green install-btn" type="button" hidden>Instalar app</button>
             <button id="clearAppDataBtn" class="btn red" type="button">Limpiar datos</button>
           </div>
@@ -1078,6 +1078,7 @@
         <div class="button-row">
           <label class="btn pink" for="reportListFile">Cargar Excel</label>
           <input id="reportListFile" class="hidden-input" type="file" accept=".xlsx,.xls">
+          <button id="saveReportListBtn" class="btn pink" type="button">Grabar</button>
           <button id="exportReportListBtn" class="btn green" type="button">Descargar Excel</button>
           <button id="viewReportListBtn" class="btn blue" type="button" aria-controls="reportListTables">Ver Excel</button>
         </div>
@@ -4620,6 +4621,22 @@ ${item.voice.trim() || "Sin texto aportado."}`;
     const reportListDate = document.getElementById("reportListDate");
     const reportListTables = document.getElementById("reportListTables");
     const reportListStatus = document.getElementById("reportListStatus");
+    document.getElementById("saveReportListBtn").addEventListener("click", async event => {
+      const list = appState.current.systemList;
+      if (!list?.sheets.length) {
+        setStatus(reportListStatus, "Carga un Excel antes de grabar.", true);
+        return;
+      }
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        if (await saveReportList()) setStatus(reportListStatus, "Excel grabado en este informe.");
+      } catch {
+        setStatus(reportListStatus, "No se pudo grabar el Excel en este dispositivo.", true);
+      } finally {
+        button.disabled = false;
+      }
+    });
     async function saveReportList() {
       const report = getReport(appState.current.editingId);
       if (report) report.systemList = cloneData(appState.current.systemList);
@@ -5328,13 +5345,13 @@ ${item.voice.trim() || "Sin texto aportado."}`;
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const reloadKey = "sistemas-sw-reload-v66";
+        const reloadKey = "sistemas-sw-reload-v67";
         if (sessionStorage.getItem(reloadKey)) return;
         sessionStorage.setItem(reloadKey, "1");
         window.location.reload();
       });
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js?v=66", { updateViaCache: "none" })
+        navigator.serviceWorker.register("sw.js?v=67", { updateViaCache: "none" })
           .then(registration => registration.update())
           .catch(() => {});
         requestPersistentStorage();
